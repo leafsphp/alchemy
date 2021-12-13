@@ -1,0 +1,38 @@
+{
+	"name": "leafs/alchemy",
+	"description": "Modern and Delightful PHP testing library focused on simplicity",
+	"keywords": [
+		"testing",
+		"alchemy",
+		"phpunit",
+		"leaf",
+		"php",
+		"framework"
+	],
+	"homepage": "https://alchemy.leafphp.dev",
+	"type": "library",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Michael Darko",
+			"email": "mickdd22@gmail.com",
+			"homepage": "https://mychi.netlify.app",
+			"role": "Developer"
+		}
+	],
+	"autoload": {
+		"psr-4": {
+			"Leaf\\": "src"
+		},
+		"files": [
+			"src/functions.php"
+		]
+	},
+	"minimum-stability": "dev",
+	"prefer-stable": true,
+	"require": {
+		"leafs/http": "^1.1",
+		"leafs/router": "^0.1.4",
+		"leafs/anchor": "^1.1"
+	}
+}
