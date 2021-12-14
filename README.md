@@ -74,48 +74,11 @@ To report a security vulnerability, you can reach out to [@mychidarko](https://t
 	<tr>
 		<td align="center">
 			<a href="https://github.com/mychidarko">
-				<img src="https://avatars.githubusercontent.com/u/26604242?v=4" width="100%" alt=""/>
+				<img src="https://avatars.githubusercontent.com/u/26604242?v=4" width="120px" alt=""/>
 				<br />
 				<sub>
 					<b>Michael Darko</b>
 				</sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="https://github.com/ftonato">
-				<img src="https://avatars.githubusercontent.com/u/5417662?v=4" width="100%" alt=""/>
-				<br />
-				<sub><b>Ademílson F. Tonato</b></sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="https://github.com/herber">
-				<img src="https://avatars.githubusercontent.com/u/22559657?&v=4" width="100%" alt=""/>
-				<br />
-				<sub><b>Tobias Herber</b></sub>
-			</a>
-		</td>
-	</tr>
-	<tr>
-		<td align="center">
-			<a href="https://github.com/pjotrsavitski">
-				<img src="https://avatars.githubusercontent.com/u/518331?&v=4" width="100%" alt=""/>
-				<br />
-				<sub><b>Pjotr Savitski</b></sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="https://github.com/pablouser1">
-				<img src="https://avatars.githubusercontent.com/u/17802865?&v=4" width="100%" alt=""/>
-				<br />
-				<sub><b>Pablo Ferreiro</b></sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="https://github.com/monkeywithacupcake">
-				<img src="https://avatars.githubusercontent.com/u/7316730?v=4" width="100%" alt=""/>
-				<br />
-				<sub><b>jess</b></sub>
 			</a>
 		</td>
 	</tr>
@@ -133,21 +96,21 @@ And to all our existing cash/code contributors, we love you all ❤️
 	<tr>
 		<td align="center">
 			<a href="https://opencollective.com/aaron-smith3">
-				<img src="https://images.opencollective.com/aaron-smith3/08ee620/avatar/256.png" width="100" alt=""/>
+				<img src="https://images.opencollective.com/aaron-smith3/08ee620/avatar/256.png" width="120px" alt=""/>
 				<br />
 				<sub><b>Aaron Smith</b></sub>
 			</a>
 		</td>
 		<td align="center">
 			<a href="https://opencollective.com/peter-bogner">
-				<img src="https://images.opencollective.com/peter-bogner/avatar/256.png" width="100" alt=""/>
+				<img src="https://images.opencollective.com/peter-bogner/avatar/256.png" width="120px" alt=""/>
 				<br />
 				<sub><b>Peter Bogner</b></sub>
 			</a>
 		</td>
 		<td align="center">
 			<a href="#">
-				<img src="https://images.opencollective.com/guest-32634fda/avatar.png" width="100" alt=""/>
+				<img src="https://images.opencollective.com/guest-32634fda/avatar.png" width="120px" alt=""/>
 				<br />
 				<sub><b>Vano</b></sub>
 			</a>
