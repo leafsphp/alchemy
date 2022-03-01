@@ -1,0 +1,28 @@
+#!/usr/bin/env php
+<?php
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+// $alchemyRoot = dirname(__DIR__);
+// $vendorPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
+
+// if (file_exists($vendorPath)) {
+// 	include_once $vendorPath;
+// 	$autoloader = $vendorPath;
+// }
+
+// to support using Alchemy as root. To run dev tests.
+// $rootPath = isset($autoloader) ? dirname($autoloader, 2) : $alchemyRoot;
+
+// $alchemy = json_decode(file_get_contents($alchemyRoot . "/composer.json"));
+// $currentVersion = $alchemy->version;
+
+$app = new Symfony\Component\Console\Application('Alchemy Test Suite', '1');
+
+// $app->add(new Leaf\Console\CreateCommand);
+// $app->add(new Leaf\Console\UpdateCommand);
+// $app->add(new Leaf\Console\InstallCommand);
+// $app->add(new Leaf\Console\ServeCommand);
+// $app->add(new Leaf\Console\InteractCommand);
+
+$app->run();
