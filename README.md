@@ -11,7 +11,7 @@
 [![Total Downloads](https://poser.pugx.org/leafs/alchemy/downloads)](https://packagist.org/packages/leafs/alchemy)
 [![License](https://poser.pugx.org/leafs/alchemy/license)](https://packagist.org/packages/leafs/alchemy)
 
-Alchemy is a Leaf module which allows you to quickly and efficiently create and run tests in your Leaf apps. Leaf 3 is built with testing in mind. In fact, support for testing with Pest PHP/PHPUnit is included out of the box. However, Alchemy allows you to avoid all the hustle and write your tests without having to setup anything. Just create your `test`/`tests` folder and start writing your tests.
+Alchemy is a Leaf module which allows you to quickly and efficiently create and run tests in your Leaf apps. Leaf 3 is built with testing in mind. In fact, support for testing with Pest PHP/PHPUnit is included out of the box. However, Alchemy allows you to avoid all the hustle and write your tests without having to setup anything. Just run the setup script and run your tests without any config or anything like that.
 
 ## 📦 Installation
 
@@ -27,28 +27,41 @@ Or with composer
 composer require leafs/alchemy
 ```
 
-## 🗂 Getting Started
+## 🗂 Your First Test
 
-By default, alchemy will look for a `test` or `tests` folder in the root of your project and will run all files in the directory that end with `.test.php`. If both of these directories exist, alchemy will use only the `tests` directory.
+After installing Alchemy, simply run the setup script
 
-Also, Alchemy allows you to group tests under `feature` and `unit` directories which run feature and unit tests respectively. If a test is written outside of these directories, it is automatically treated as a unit test.
+```sh
+./vendor/bin/alchemy setup
+```
 
-All of these coupled with other features means that you can install Alchemy and start writing your tests immediately without doing any configuration.
+This uses Pest PHP by default. If you want to use PHPUnit, you can add the `--phpunit` option to the setup script.
+
+```sh
+./vendor/bin/alchemy setup --phpunit
+```
+
+This will setup dummy tests and an `alchemy.config.php` file which you can use to gain a little more control over your tests. After writing the tests you need to write, you can simply run the test script.
+
+```sh
+./vendor/bin/alchemy run
+```
+
+Based on your engine, you might see either of the outputs below
+
+- PEST PHP
+
+<img width="307" alt="image" src="https://user-images.githubusercontent.com/26604242/182198978-1b8e2ba2-42e7-4345-82d0-3ae5be35d299.png">
+
+- PHPUnit
+
+<img width="770" alt="image" src="https://user-images.githubusercontent.com/26604242/182198446-47a4a581-3aa4-470c-b450-420604b9bb6c.png">
 
 > Alchemy is a test runner, not a testing framework.
 
-## 👨🏾‍💻 Writing tests
+### Commands
 
-After installing Alchemy, create a `tests` directory and add a new file, eg: `example.test.php`
-
-```php
-test('n is null', function () {
-  $n = null;
-  expect($n)->toBeNull();
-});
-```
-
-> Note that Alchemy will only run files with the `.test.php` extension. This is to give more room for setup files and more.
+<img width="723" alt="image" src="https://user-images.githubusercontent.com/26604242/182193129-b76bfcda-c74e-4458-801b-650939ed2f5f.png">
 
 ## 💬 Stay In Touch
 
