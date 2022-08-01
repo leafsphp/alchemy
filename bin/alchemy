@@ -20,7 +20,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 $app = new Symfony\Component\Console\Application('Leaf Alchemy', '0.0.1');
 
 $app->add(new Leaf\Alchemy\Commands\SetupCommand);
-// $app->add(new Leaf\Console\UpdateCommand);
+$app->add(new Leaf\Alchemy\Commands\EjectCommand);
 // $app->add(new Leaf\Console\InstallCommand);
 // $app->add(new Leaf\Console\ServeCommand);
 // $app->add(new Leaf\Console\InteractCommand);

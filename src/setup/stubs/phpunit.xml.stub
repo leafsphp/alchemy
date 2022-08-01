@@ -5,14 +5,11 @@
          colors="CONFIG.COLORS"
 >
     <testsuites>
-        <testsuite name="TESTSUITE.NAME">
-            <directory suffix=".test.php">TESTSUITE.DIRECTORY</directory>
-        </testsuite>
+        CONFIG.TESTSUITES
     </testsuites>
     <coverage processUncoveredFiles="COVERAGE.PROCESSUNCOVEREDFILES">
         <include>
-            <directory suffix="COVERAGE.INCLUDE.VALUE">COVERAGE.INCLUDE.KEY</directory>
-            <directory suffix="COVERAGE.INCLUDE.VALUE">COVERAGE.INCLUDE.KEY</directory>
+            COVERAGE.INCLUDES
         </include>
     </coverage>
 </phpunit>
