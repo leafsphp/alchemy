@@ -16,7 +16,7 @@ class ExportCommand extends Command
 	protected function configure()
 	{
 		$this
-			->setName('eject')
+			->setName('config:export')
 			->setDescription('Export alchemy config to phpunit file');
 	}
 
