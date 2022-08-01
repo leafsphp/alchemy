@@ -33,7 +33,7 @@ class RunCommand extends Command
 		}
 
 		if (!$input->getOption('phpunit') && !$input->getOption('pest') && file_exists($configFile)) {
-			$output->writeln('<comment>Using existing alchemy.config.php</comment>');
+			// $output->writeln('<comment>Using existing alchemy.config.php</comment>');
 			$config = require $configFile;
 			$engine = $config['engine'];
 		}
