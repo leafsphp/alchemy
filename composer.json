@@ -42,6 +42,6 @@
 	"minimum-stability": "dev",
 	"prefer-stable": true,
 	"require-dev": {
-		"pestphp/pest": "^1.21"
+		"pestphp/pest": "*"
 	}
 }
