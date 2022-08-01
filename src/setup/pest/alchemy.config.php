@@ -1,6 +1,9 @@
 <?php
 
 return [
+	// alchemy options
+	'engine' => 'pest',
+
 	// php unit options
 	'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
 	'xsi:noNamespaceSchemaLocation' => './vendor/phpunit/phpunit/phpunit.xsd',

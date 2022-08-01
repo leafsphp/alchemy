@@ -18,7 +18,6 @@
 		}
 	],
 	"require": {
-		"leafs/fs": "^1.0",
 		"psy/psysh": "^0.9.9",
 		"symfony/console": "^5.0",
 		"symfony/process": "^5.0",
@@ -37,11 +36,15 @@
 		]
 	},
 	"config": {
-		"sort-packages": true
+		"sort-packages": true,
+		"allow-plugins": {
+			"pestphp/pest-plugin": true
+		}
 	},
 	"minimum-stability": "dev",
 	"prefer-stable": true,
 	"require-dev": {
+		"leafs/fs": "*",
 		"pestphp/pest": "*"
 	}
 }

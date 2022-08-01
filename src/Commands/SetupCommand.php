@@ -40,156 +40,23 @@ class SetupCommand extends Command
 	protected function execute(InputInterface $input, OutputInterface $output): int
 	{
 		$composer = $this->findComposer();
-		$needsUpdate = Package::updateAvailable();
+		$directory = getcwd() . '/tests';
+		$engine = 'pest';
 
-		if ($needsUpdate) {
-			$output->writeln("<comment>Update found, updating to the latest stable version...</comment>");
-			$updateProcess = Process::fromShellCommandline("php " . dirname(__DIR__) . "/bin/leaf update");
-
-			$updateProcess->run();
-
-			if ($updateProcess->isSuccessful()) {
-				$output->writeln("<info>Leaf CLI updated successfully, building your app...</info>\n");
-			}
+		if ($input->getOption('phpunit')) {
+			$engine = 'phpunit';
 		}
 
-		$name = $input->getArgument('project-name');
-		$directory = $name !== '.' ? getcwd() . '/' . $name : getcwd();
+		$output->writeln("<comment>Using @$engine.</comment>");
 
-		if (!$input->getOption('force')) {
-			$this->verifyApplicationDoesntExist($directory);
-		}
-
-		$preset = $this->getPreset($input, $output);
-		$this->getVersion($input, $output);
-
-		$output->writeln(
-			"\n<comment> - </comment>Creating \""
-			. basename($directory) . "\" in <info>./"
-			. basename(dirname($directory)) .
-			"</info> using <info>$preset@" . $this->version .  "</info>."
+		\Leaf\FS::superCopy(
+			dirname(__DIR__) . "/setup/$engine",
+			getcwd(),
 		);
 
-		if ($preset === "leaf") {
-			return $this->leaf($input, $output, $directory);
-		}
-
-		$installCommand = $composer . " create-project leafs/$preset " . basename($directory);
-
-		if ($this->version === "v3") {
-			$installCommand .= " v3.x-dev";
-		}
-
-		$commands = [
-			$installCommand,
-		];
-
-		if ($input->getOption('no-ansi')) {
-			$commands = array_map(function ($value) {
-				return $value . ' --no-ansi';
-			}, $commands);
-		}
-
-		if ($input->getOption('quiet')) {
-			$commands = array_map(function ($value) {
-				return $value . ' --quiet';
-			}, $commands);
-		}
-
-		$process = Process::fromShellCommandline(
-			implode(' && ', $commands), dirname($directory), null, null, null
-		);
-
-		if ('\\' !== DIRECTORY_SEPARATOR && file_exists('/dev/tty') && is_readable('/dev/tty')) {
-			$process->setTty(true);
-		}
-
-		$process->run(function ($type, $line) use ($output) {
-			$output->write($line);
-		});
-
-		if ($process->isSuccessful()) {
-			$output->writeln("\nYou can start with:");
-			$output->writeln("\n  <info>cd</info> " . basename($directory));
-			$output->writeln("  <info>leaf app:serve</info>");
-			$output->writeln("\nHappy gardening!");
-		}
+		$output->writeln('<info>Tests setup successfully.</info>');
 
 		return 0;
-	}
-
-	/**
-	 * Verify that the application does not already exist.
-	 *
-	 * @param string $directory
-	 * @return void
-	 */
-	protected function verifyApplicationDoesntExist(string $directory)
-	{
-		if ((is_dir($directory) || is_file($directory)) && $directory != getcwd()) {
-			throw new RuntimeException('Application already exists!');
-		}
-	}
-
-	/**
-	 * Get the version that should be downloaded.
-	 *
-	 * @param InputInterface $input
-	 * @param $output
-	 * @return void
-	 */
-	protected function getVersion(InputInterface $input, $output)
-	{
-		if ($input->getOption("v3")) {
-			$this->version = "v3";
-			return;
-		}
-
-		if ($input->getOption("v2")) {
-			$this->version = "v2";
-			return;
-		}
-
-		$this->version = $this->scaffoldVersion($input, $output);
-	}
-
-	/**
-	 * Get the preset that should be downloaded.
-	 *
-	 * @param InputInterface $input
-	 * @param $output
-	 * @return string
-	 */
-	protected function getPreset(InputInterface $input, $output): string
-	{
-		if ($input->getOption("basic")) {
-			return "leaf";
-		}
-
-		if ($input->getOption("api")) {
-			return "api";
-		}
-
-		if ($input->getOption("mvc")) {
-			return "mvc";
-		}
-
-		if ($input->getOption("skeleton")) {
-			return "skeleton";
-		}
-
-		$preset = $this->scaffold($input, $output);
-		$output->writeln("\n<comment> - </comment>Using preset $preset\n");
-
-		if ($preset == "leaf api") {
-			return "api";
-		}
-
-		if ($preset == "leaf mvc") {
-			return "mvc";
-		}
-
-		return $preset;
 	}
 
 	/**

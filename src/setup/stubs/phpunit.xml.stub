@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="CONFIG.XMLNSXSI"
+         xsi:noNamespaceSchemaLocation="CONFIG.NONSLOCATION"
+         bootstrap="CONFIG.BOOTSTRAP"
+         colors="CONFIG.COLORS"
+>
+    <testsuites>
+        <testsuite name="TESTSUITE.NAME">
+            <directory suffix=".test.php">TESTSUITE.DIRECTORY</directory>
+        </testsuite>
+    </testsuites>
+    <coverage processUncoveredFiles="COVERAGE.PROCESSUNCOVEREDFILES">
+        <include>
+            <directory suffix="COVERAGE.INCLUDE.VALUE">COVERAGE.INCLUDE.KEY</directory>
+            <directory suffix="COVERAGE.INCLUDE.VALUE">COVERAGE.INCLUDE.KEY</directory>
+        </include>
+    </coverage>
+</phpunit>
