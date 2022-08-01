@@ -5,15 +5,13 @@
     <br><br>
 </p>
 
-<h1 align="center">Alchemy PHP</h1>
+<h1 align="center">Alchemy</h1>
 
 [![Latest Stable Version](https://poser.pugx.org/leafs/alchemy/v/stable)](https://packagist.org/packages/leafs/alchemy)
 [![Total Downloads](https://poser.pugx.org/leafs/alchemy/downloads)](https://packagist.org/packages/leafs/alchemy)
 [![License](https://poser.pugx.org/leafs/alchemy/license)](https://packagist.org/packages/leafs/alchemy)
 
-Alchemy is a modern and delightful PHP testing library focused on simplicity and developer experience. We believe that testing should not be a pain: you should focus on building your app instead.
-
-Alchemy is heavily inspired by [Facebook's Jest framework](https://jestjs.io/) and uses some concepts from [Docker](https://www.docker.com/) to provide the easiest and simplest tests known to PHP.
+Alchemy is a Leaf module which allows you to quickly and efficiently create and run tests in your Leaf apps. Leaf 3 is built with testing in mind. In fact, support for testing with Pest PHP/PHPUnit is included out of the box. However, Alchemy allows you to avoid all the hustle and write your tests without having to setup anything. Just create your `test`/`tests` folder and start writing your tests.
 
 ## 📦 Installation
 
@@ -36,6 +34,8 @@ By default, alchemy will look for a `test` or `tests` folder in the root of your
 Also, Alchemy allows you to group tests under `feature` and `unit` directories which run feature and unit tests respectively. If a test is written outside of these directories, it is automatically treated as a unit test.
 
 All of these coupled with other features means that you can install Alchemy and start writing your tests immediately without doing any configuration.
+
+> Alchemy is a test runner, not a testing framework.
 
 ## 👨🏾‍💻 Writing tests
 
