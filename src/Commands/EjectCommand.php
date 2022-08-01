@@ -16,7 +16,7 @@ class EjectCommand extends Command
 	protected function configure()
 	{
 		$this
-			->setName('eject')
+			->setName('config:eject')
 			->setDescription('Switch from alchemy to pest or phpunit');
 	}
 
