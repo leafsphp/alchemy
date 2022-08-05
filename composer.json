@@ -2,7 +2,6 @@
 	"name": "leafs/alchemy",
 	"description": "A simple command line tool for installing and interacting with your leaf apps",
 	"homepage": "https://leafphp.dev/docs/tooling/testing",
-	"version": "v0.1.0",
 	"keywords": [
 		"leaf",
 		"php",
