@@ -22,7 +22,9 @@
 		"symfony/console": "^5.0",
 		"symfony/process": "^5.0",
 		"phpunit/phpunit": "^9.0",
-      	"ext-json": "*"
+      	"ext-json": "*",
+		"leafs/fs": "*",
+		"pestphp/pest": "*"
     },
 	"bin": [
 		"bin/alchemy"
@@ -42,9 +44,5 @@
 		}
 	},
 	"minimum-stability": "dev",
-	"prefer-stable": true,
-	"require-dev": {
-		"leafs/fs": "*",
-		"pestphp/pest": "*"
-	}
+	"prefer-stable": true
 }
