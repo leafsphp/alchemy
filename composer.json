@@ -18,14 +18,16 @@
 		}
 	],
 	"require": {
-		"psy/psysh": "^0.10.0",
-		"symfony/console": "^5.0",
-		"symfony/process": "^5.0",
-		"phpunit/phpunit": "^9.0",
-      	"ext-json": "*",
-		"leafs/fs": "*",
+		"psy/psysh": "^0.10.9|^0.11",
+		"symfony/console": "^5.0|^6.0",
+		"symfony/process": "^5.0|^6.0",
+		"ext-json": "*",
+		"leafs/fs": "*"
+	},
+	"require-dev": {
+		"phpunit/phpunit": "*",
 		"pestphp/pest": "*"
-    },
+	},
 	"bin": [
 		"bin/alchemy"
 	],
