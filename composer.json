@@ -1,12 +1,15 @@
 {
 	"name": "leafs/alchemy",
-	"description": "A simple command line tool for installing and interacting with your leaf apps",
+	"version": "2.0.0",
+	"description": "Integrated testing/style fixing tool for your PHP apps",
 	"homepage": "https://leafphp.dev/docs/tooling/testing",
 	"keywords": [
 		"leaf",
 		"php",
 		"testing",
-		"test"
+		"test",
+		"linting",
+		"actions"
 	],
 	"license": "MIT",
 	"authors": [
@@ -23,10 +26,6 @@
 		"symfony/process": "^5.0|^6.0",
 		"ext-json": "*",
 		"leafs/fs": "*"
-	},
-	"require-dev": {
-		"phpunit/phpunit": "*",
-		"pestphp/pest": "*"
 	},
 	"bin": [
 		"bin/alchemy"

@@ -2,30 +2,20 @@
 <?php
 
 $vendorPath = dirname(__DIR__) . '/vendor/autoload.php';
+$appVendorPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
 
-if (!is_file($vendorPath)) {
-	$vendorPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
+if (file_exists($appVendorPath)) {
+	require $appVendorPath;
 }
 
 require $vendorPath;
 
-// $alchemyRoot = dirname(__DIR__);
-// $vendorPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
-
-// if (file_exists($vendorPath)) {
-// 	include_once $vendorPath;
-// 	$autoloader = $vendorPath;
-// }
-
-// to support using Alchemy as root. To run dev tests.
-// $rootPath = isset($autoloader) ? dirname($autoloader, 2) : $alchemyRoot;
-
-// $alchemy = json_decode(file_get_contents($alchemyRoot . "/composer.json"));
-// $currentVersion = $alchemy->version;
+$alchemy = json_decode(file_get_contents(dirname(__DIR__) . '/composer.json'));
+$currentVersion = $alchemy->version;
 
 $app = new Symfony\Component\Console\Application("
     _    _      _                          
-   / \  | | ___| |__   ___ _ __ ___  _  1.0.2 
+   / \  | | ___| |__   ___ _ __ ___  _  <comment>$currentVersion</comment>
   / _ \ | |/ __| '_ \ / _ \ '_ ` _ \| | | |
  / ___ \| | (__| | | |  __/ | | | | | |_| |
 /_/   \_\_|\___|_| |_|\___|_| |_| |_|\__, |
