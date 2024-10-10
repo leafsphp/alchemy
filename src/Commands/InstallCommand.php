@@ -31,19 +31,37 @@ class InstallCommand extends Command
 	 */
 	protected function execute(InputInterface $input, OutputInterface $output): int
 	{
-		if (file_exists(getcwd() . '/alchemy.yml') && !$input->getOption('force')) {
-			$output->writeln('<comment>Alchemy already installed.</comment>');
-
-			return 0;
+		$appAlchemyFile = (getcwd() . '/alchemy.yml');
+		if (!file_exists($appAlchemyFile) || (file_exists($appAlchemyFile) && !$input->getOption('force'))) {
+			copy(
+				dirname(__DIR__) . '/setup/pest/alchemy.yml',
+				getcwd() . '/alchemy.yml',
+			);
 		}
-		
-		copy(
-			dirname(__DIR__) . '/setup/pest/alchemy.yml',
-			getcwd() . '/alchemy.yml',
-		);
+
+		$this->updateComposerJson();
 
 		$output->writeln('<info>Alchemy installed successfully.</info>');
 
 		return 0;
+	}
+
+	protected function updateComposerJson()
+	{
+		$appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
+
+		$composerConfig = $appComposerJson['config'] ?? [];
+		$composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
+
+		$appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
+		$appComposerJson['scripts']['test'] = './vendor/bin/alchemy test';
+		$appComposerJson['scripts']['lint'] = './vendor/bin/alchemy lint';
+		$appComposerJson['config'] = array_merge($composerConfig, [
+			'allow-plugins' => array_merge($composerConfigPlugins, [
+				'pestphp/pest-plugin' => true,
+			]),
+		]);
+
+		file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 	}
 }
