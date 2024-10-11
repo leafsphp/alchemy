@@ -45,14 +45,13 @@
 			"pestphp/pest-plugin": true
 		}
 	},
-	"scripts": {
-		"post-install-cmd": [
-			"@php ./vendor/bin/alchemy install"
-		],
-		"post-update-cmd": [
-			"@php ./vendor/bin/alchemy install"
-		]
-	},
+    "extra": {
+        "alchemy": {
+            "setup": [
+                "@php -r \"echo 'This is a test';\""
+            ]
+        }
+    },
 	"minimum-stability": "dev",
 	"prefer-stable": true
 }
