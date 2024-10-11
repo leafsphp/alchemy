@@ -1,14 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-$vendorPath = dirname(__DIR__) . '/vendor/autoload.php';
-$appVendorPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
-
-if (file_exists($appVendorPath)) {
-	require $appVendorPath;
-}
-
-require $vendorPath;
+require dirname(__DIR__) . '/vendor/autoload.php';
 
 $alchemy = json_decode(file_get_contents(dirname(__DIR__) . '/composer.json'));
 $currentVersion = $alchemy->version;
@@ -22,9 +15,9 @@ $app = new Symfony\Component\Console\Application("
                                      |___/ 
 ");
 
+$app->add(new Leaf\Alchemy\Commands\InstallCommand);
 $app->add(new Leaf\Alchemy\Commands\SetupCommand);
-$app->add(new Leaf\Alchemy\Commands\ExportCommand);
-$app->add(new Leaf\Alchemy\Commands\EjectCommand);
-$app->add(new Leaf\Alchemy\Commands\RunCommand);
+// $app->add(new Leaf\Alchemy\Commands\EjectCommand);
+// $app->add(new Leaf\Alchemy\Commands\RunCommand);
 
 $app->run();
