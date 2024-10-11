@@ -56,8 +56,9 @@ class InstallCommand extends Command
         $composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
 
         $appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
-        $appComposerJson['scripts']['test'] = './vendor/bin/alchemy test';
-        $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy lint';
+        $appComposerJson['scripts']['test'] = './vendor/bin/alchemy setup --test';
+        $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy setup --lint';
+
         $appComposerJson['config'] = array_merge($composerConfig, [
             'allow-plugins' => array_merge($composerConfigPlugins, [
                 'pestphp/pest-plugin' => true,
