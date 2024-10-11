@@ -85,7 +85,7 @@ class SetupCommand extends Command
                 null
             );
 
-            $engineInstallProcess->setTty(true);
+            // $engineInstallProcess->setTty(true);
 
             $this->output->writeln("<info>Setting up tests with $engine...</info>\n");
 
@@ -123,7 +123,7 @@ class SetupCommand extends Command
             null
         );
 
-        $testProcess->setTty(true);
+        // $testProcess->setTty(true);
 
         $testProcess->run(function ($type, $line): void {
             $this->output->write($line);
@@ -145,7 +145,7 @@ class SetupCommand extends Command
                 null
             );
 
-            $engineInstallProcess->setTty(true);
+            // $engineInstallProcess->setTty(true);
 
             $this->output->writeln("<info>Setting up linting with php-cs-fixer...</info>\n");
 
@@ -174,7 +174,7 @@ class SetupCommand extends Command
             null
         );
 
-        $testProcess->setTty(true);
+        // $testProcess->setTty(true);
 
         $testProcess->run(function ($type, $line): void {
             $this->output->write($line);
