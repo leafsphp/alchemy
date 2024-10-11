@@ -2,52 +2,198 @@
 
 namespace Leaf\Alchemy\Commands;
 
+use Leaf\Alchemy\Core;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 
 class SetupCommand extends Command
 {
-	/**
-	 * Configure the command options.
-	 *
-	 * @return void
-	 */
-	protected function configure()
-	{
-		$this
-			->setName('setup')
-			->setDescription('Setup default alchemy tests')
-			->addOption('pest', null, InputOption::VALUE_NONE, 'Setup tests with Pest PHP (default)')
-			->addOption('phpunit', null, InputOption::VALUE_NONE, 'Setup tests with PHPUnit')
-			->addOption('replace', 'r', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists');
-	}
+    protected $output;
+    protected $input;
 
-	/**
-	 * Execute the command.
-	 *
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
-	 */
-	protected function execute(InputInterface $input, OutputInterface $output): int
-	{
-		$engine = 'pest';
+    /**
+     * Configure the command options.
+     *
+     * @return void
+     */
+    protected function configure()
+    {
+        $this
+            ->setName('setup')
+            ->setDescription('Setup work environment based on Alchemy configuration')
+            ->addOption('lint', 'l', InputOption::VALUE_NONE, 'Run only linter')
+            ->addOption('test', 't', InputOption::VALUE_NONE, 'Run only tests')
+            ->addOption('actions', 'gh', InputOption::VALUE_NONE, 'Generate GitHub actions')
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists');
+    }
 
-		if ($input->getOption('phpunit')) {
-			$engine = 'phpunit';
-		}
+    /**
+     * Execute the command.
+     *
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     */
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $this->input = $input;
+        $this->output = $output;
 
-		$output->writeln("<comment>Using @$engine.</comment>");
+        Core::set(Yaml::parseFile(getcwd() . '/alchemy.yml'));
+        \Leaf\FS::createFolder(getcwd() . '/.alchemy');
 
-		\Leaf\FS::superCopy(
-			dirname(__DIR__) . "/setup/$engine",
-			getcwd(),
-		);
+        if ($input->getOption('test')) {
+            return $this->runTests();
+        }
 
-		$output->writeln('<info>Tests setup successfully.</info>');
+        if ($input->getOption('lint')) {
+            return $this->runLinter();
+        }
 
-		return 0;
-	}
+        if ($input->getOption('actions')) {
+            return $this->generateActions();
+        }
+
+        if (!$input->getOption('test') && !$input->getOption('lint') && !$input->getOption('actions')) {
+            $this->runTests();
+            $this->runLinter();
+            $this->generateActions();
+        }
+
+        $output->writeln('<info>Alchemy setup successfully.</info>');
+
+        return 0;
+    }
+
+    protected function runTests()
+    {
+        $config = Core::get('tests');
+
+        $engine = $config['engine'] ?? 'pest';
+        $engineInstaller = $engine === 'pest' ? 'pestphp/pest --with-all-dependencies' : 'phpunit/phpunit';
+
+        if (!file_exists(getcwd() . "/vendor/bin/$engine")) {
+            $engineInstallProcess = Process::fromShellCommandline(
+                "composer require $engineInstaller --dev",
+                null,
+                null,
+                null,
+                null
+            );
+
+            $engineInstallProcess->setTty(true);
+
+            $this->output->writeln("<info>Setting up tests with $engine...</info>\n");
+
+            $engineInstallProcess->run(function ($type, $line) {
+                $this->output->write($line);
+            });
+
+            if (!$engineInstallProcess->isSuccessful()) {
+                $this->output->writeln("<error>Couldn\'t install $engine. Check your connection and try again.</error>");
+
+                return 1;
+            }
+
+            $this->output->writeln("<info>$engine installed successfully!</info>");
+        }
+
+        if (!is_dir(getcwd() . '/' . ($config['paths'][0] ?? '/tests'))) {
+            $this->output->writeln('<info>Writing sample tests...</info>');
+
+            \Leaf\FS::superCopy(
+                dirname(__DIR__) . "/setup/$engine",
+                getcwd(),
+            );
+        }
+
+        Core::generateTestFiles();
+
+        $this->output->writeln('<comment>Running your tests...</comment>');
+
+        $testProcess = Process::fromShellCommandline(
+            getcwd() . "/vendor/bin/$engine",
+            null,
+            null,
+            null,
+            null
+        );
+
+        $testProcess->setTty(true);
+
+        $testProcess->run(function ($type, $line): void {
+            $this->output->write($line);
+        });
+
+        \Leaf\FS::deleteFile(getcwd() . '/phpunit.xml');
+
+        return 0;
+    }
+
+    protected function runLinter()
+    {
+        if (!file_exists(getcwd() . '/vendor/bin/php-cs-fixer')) {
+            $engineInstallProcess = Process::fromShellCommandline(
+                'composer require friendsofphp/php-cs-fixer --dev',
+                null,
+                null,
+                null,
+                null
+            );
+
+            $engineInstallProcess->setTty(true);
+
+            $this->output->writeln("<info>Setting up linting with php-cs-fixer...</info>\n");
+
+            $engineInstallProcess->run(function ($type, $line) {
+                $this->output->write($line);
+            });
+
+            if (!$engineInstallProcess->isSuccessful()) {
+                $this->output->writeln('<error>Couldn\'t install PHP-CS-Fixer. Check your connection and try again.</error>');
+
+                return 1;
+            }
+
+            $this->output->writeln('<info>Linter installed successfully!</info>');
+        }
+
+        Core::generateLintFiles();
+
+        $this->output->writeln("<comment>Running linter...</comment>\n");
+
+        $testProcess = Process::fromShellCommandline(
+            getcwd() . '/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes',
+            null,
+            null,
+            null,
+            null
+        );
+
+        $testProcess->setTty(true);
+
+        $testProcess->run(function ($type, $line): void {
+            $this->output->write($line);
+        });
+
+        \Leaf\FS::deleteFile(getcwd() . '/.php_cs.dist.php');
+
+        if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
+            \Leaf\FS::moveFile(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
+        }
+
+        return 0;
+    }
+
+    protected function generateActions()
+    {
+        $config = Core::get('actions');
+        echo json_encode($config, JSON_PRETTY_PRINT) . "\n\n";
+
+        return 0;
+    }
 }
