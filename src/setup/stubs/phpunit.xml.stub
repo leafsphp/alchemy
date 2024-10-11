@@ -3,13 +3,14 @@
          xsi:noNamespaceSchemaLocation="CONFIG.NONSLOCATION"
          bootstrap="CONFIG.BOOTSTRAP"
          colors="CONFIG.COLORS"
+         cacheDirectory=".alchemy"
 >
     <testsuites>
         CONFIG.TESTSUITES
     </testsuites>
-    <coverage processUncoveredFiles="COVERAGE.PROCESSUNCOVEREDFILES">
+    <source>
         <include>
             COVERAGE.INCLUDES
         </include>
-    </coverage>
+    </source>
 </phpunit>

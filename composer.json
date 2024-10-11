@@ -21,11 +21,12 @@
 		}
 	],
 	"require": {
+		"ext-json": "*",
+		"leafs/fs": "*",
 		"psy/psysh": "^0.10.9|^0.11",
 		"symfony/console": "^5.0|^6.0",
 		"symfony/process": "^5.0|^6.0",
-		"ext-json": "*",
-		"leafs/fs": "*"
+		"symfony/yaml": "*"
 	},
 	"bin": [
 		"bin/alchemy"

@@ -1,14 +1,14 @@
 name: Run Tests
 
-on: [ALCHEMY.ACTIONS.EVENTS]
+on: [ACTIONS.EVENTS]
 
 jobs:
   ci:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ALCHEMY.ACTIONS.OS]
-        php: [ALCHEMY.ACTIONS.PHP.VERSIONS]
+        os: [ACTIONS.OS]
+        php: [ACTIONS.PHP.VERSIONS]
 
     name: PHP ${{ matrix.php }} - ${{ matrix.os }}
 
@@ -20,7 +20,7 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php }}
-        extensions: ALCHEMY.ACTIONS.PHP.EXTENSIONS
+        extensions: ACTIONS.PHP.EXTENSIONS
         tools: composer:v2
         coverage: xdebug
 
