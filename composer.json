@@ -44,13 +44,6 @@
 			"pestphp/pest-plugin": true
 		}
 	},
-    "extra": {
-        "alchemy": {
-            "setup": [
-                "@php -r \"echo 'This is a test';\""
-            ]
-        }
-    },
 	"minimum-stability": "dev",
 	"prefer-stable": true
 }
