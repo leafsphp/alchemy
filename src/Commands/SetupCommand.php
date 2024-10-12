@@ -192,7 +192,32 @@ class SetupCommand extends Command
     protected function generateActions()
     {
         $config = Core::get('actions');
-        echo json_encode($config, JSON_PRETTY_PRINT) . "\n\n";
+        $actionToRun = $config['run'] ?? [];
+
+        \Leaf\FS::createFolder(getcwd() . '/.github');
+
+        foreach ($actionToRun as $action) {
+            $actionFile = getcwd() . "/.github/workflows/$action.yml";
+            $phpVersions = $config['php']['versions'] ?? ['8.3'];
+            $phpExtensions = $config['php']['extensions'] ?? 'json, zip';
+            $os = $config['os'] ?? ['ubuntu-latest'];
+            $events = $config['events'] ?? ['push'];
+            $failFast = $config['fail-fast'] ?? true;
+
+            if (!file_exists($actionFile)) {
+                $this->output->writeln("<info>Writing GitHub action $action.yml...</info>");
+
+                $actionStub = \Leaf\FS::readFile(dirname(__DIR__) . "/setup/workflows/$action.yml");
+
+                $actionStub = str_replace(
+                    ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST'],
+                    [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false'],
+                    $actionStub
+                );
+
+                \Leaf\FS::writeFile($actionFile, $actionStub);
+            }
+        }
 
         return 0;
     }

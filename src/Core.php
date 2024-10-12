@@ -29,9 +29,9 @@ class Core
         return self::$config;
     }
 
-    public static function unJsonify($data)
+    public static function unJsonify($data, $pretty = JSON_PRETTY_PRINT)
     {
-        $parsed = str_replace(['{', '}', '\/', ':', '"__DIR__"'], ['[', ']', '/', ' =>', '__DIR__'], json_encode($data, JSON_PRETTY_PRINT));
+        $parsed = str_replace(['{', '}', '\/', ':', '"__DIR__"'], ['[', ']', '/', ' =>', '__DIR__'], json_encode($data, $pretty));
         return preg_replace('/"__DIR__\s*\.\s*\'(.*?)\'"/', '__DIR__ . \'$1\'', $parsed);
     }
 
