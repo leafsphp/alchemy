@@ -22,11 +22,13 @@ lint:
 actions:
     run:
         - lint
-        - test
+        - tests
+    os:
+        - ubuntu-latest
     php:
-        extensions: json, zip
+        extensions: json, dom, curl, libxml, mbstring
         versions:
             - '8.3'
-    event:
+    events:
         - push
         - pull_request

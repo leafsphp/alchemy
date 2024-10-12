@@ -1,14 +1,15 @@
 name: Run Tests
 
-on: [ACTIONS.EVENTS]
+on: ACTIONS.EVENTS
 
 jobs:
-  ci:
+  tests:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: ACTIONS.FAILFAST
       matrix:
-        os: [ACTIONS.OS]
-        php: [ACTIONS.PHP.VERSIONS]
+        os: ACTIONS.OS
+        php: ACTIONS.PHP.VERSIONS
 
     name: PHP ${{ matrix.php }} - ${{ matrix.os }}
 
