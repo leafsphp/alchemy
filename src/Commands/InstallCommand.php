@@ -58,6 +58,7 @@ class InstallCommand extends Command
         $appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
         $appComposerJson['scripts']['test'] = './vendor/bin/alchemy setup --test';
         $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy setup --lint';
+        $appComposerJson['scripts']['actions'] = './vendor/bin/alchemy setup --actions';
 
         $appComposerJson['config'] = array_merge($composerConfig, [
             'allow-plugins' => array_merge($composerConfigPlugins, [
