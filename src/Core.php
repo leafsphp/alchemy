@@ -75,13 +75,13 @@ class Core
             \Leaf\FS::moveFile(getcwd() . '/.alchemy/.php-cs-fixer.cache', getcwd() . '/.php-cs-fixer.cache');
         }
 
-        $appPathsConfig = $config['app'] ?? null;
         $lintConfig = $config['lint'];
         $lintRules = $lintConfig['rules'] ?? [];
         $lintPreset = $lintConfig['preset'] ?? 'PSR12';
-        $lintParallel = ($lintConfig['parallel'] ?? false) ? "\n->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())" : '';
-        $ignoreDotFiles = json_encode($lintConfig['ignore_dot_files'] ?? true, JSON_PRETTY_PRINT);
         $ignoreVCFiles = json_encode($lintConfig['ignore_vc_files'] ?? true, JSON_PRETTY_PRINT);
+        $ignoreDotFiles = json_encode($lintConfig['ignore_dot_files'] ?? true, JSON_PRETTY_PRINT);
+        $appPathsConfig = $config['app'] ? array_merge($config['app'], $config['tests']['paths'] ?? []) : null;
+        $lintParallel = ($lintConfig['parallel'] ?? false) ? "\n->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())" : '';
 
         $lintPaths = [];
         $lintRules["@$lintPreset"] = true;
