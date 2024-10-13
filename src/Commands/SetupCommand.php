@@ -115,8 +115,10 @@ class SetupCommand extends Command
 
         $this->output->writeln('<comment>Running your tests...</comment>');
 
+        $flags = $engine === 'pest' ? '--colors=always' : '';
+
         $testProcess = Process::fromShellCommandline(
-            getcwd() . "/vendor/bin/$engine",
+            getcwd() . "/vendor/bin/$engine $flags",
             null,
             null,
             null,
