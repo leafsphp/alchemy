@@ -1,0 +1,13 @@
+<?php
+
+$finder = PhpCsFixer\Finder::create()
+  ->in(LINT.PATHS)
+  ->name('*.php')
+  ->ignoreDotFiles(LINT.IGNORE_DOT_FILES)
+  ->ignoreVCS(LINT.IGNORE_VC_FILES);
+
+return (new PhpCsFixer\Config())
+  ->setRules(
+    LINT.RULES
+  )LINT.PARALLEL
+  ->setFinder($finder);
