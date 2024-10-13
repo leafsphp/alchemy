@@ -74,7 +74,7 @@ class SetupCommand extends Command
     $config = Core::get('tests');
 
     $engine = $config['engine'] ?? 'pest';
-    $engineInstaller = $engine === 'pest' ? 'pestphp/pest --with-all-dependencies' : 'phpunit/phpunit';
+    $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --with-all-dependencies' : '\'phpunit/phpunit:*\'';
 
     if (!file_exists(getcwd() . "/vendor/bin/$engine")) {
       $engineInstallProcess = Process::fromShellCommandline(
