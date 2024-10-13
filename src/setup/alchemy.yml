@@ -1,34 +1,34 @@
 app:
-    - app
-    - src
+  - app
+  - src
 
 tests:
-    engine: pest
-    parallel: true
-    paths:
-        - tests
-    files:
-        - '*.test.php'
-    coverage:
-        processUncoveredFiles: true
+  engine: pest
+  parallel: true
+  paths:
+    - tests
+  files:
+    - '*.test.php'
+  coverage:
+    processUncoveredFiles: true
 
 lint:
-    preset: PSR12
-    rules:
-        no_unused_imports: true
-        not_operator_with_successor_space: false
-        single_quote: true
+  preset: PSR12
+  rules:
+    no_unused_imports: true
+    not_operator_with_successor_space: false
+    single_quote: true
 
 actions:
-    run:
-        - lint
-        - tests
-    os:
-        - ubuntu-latest
-    php:
-        extensions: json, dom, curl, libxml, mbstring
-        versions:
-            - '8.3'
-    events:
-        - push
-        - pull_request
+  run:
+    - lint
+    - tests
+  os:
+    - ubuntu-latest
+  php:
+    extensions: json, zip, dom, curl, libxml, mbstring
+    versions:
+      - '8.3'
+  events:
+    - push
+    - pull_request

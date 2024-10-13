@@ -1,6 +1,6 @@
 <?php
 
 test('n is true', function () {
-    $n = true;
-    expect($n)->toBeTrue();
+  $n = true;
+  expect($n)->toBeTrue();
 });
