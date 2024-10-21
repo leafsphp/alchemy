@@ -29,4 +29,4 @@ jobs:
         run: composer update --no-interaction --no-progress
 
       - name: Run Tests
-        run: composer run test
+        run: composer run testACTIONS.STEPS.COVERAGE

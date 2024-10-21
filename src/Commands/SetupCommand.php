@@ -117,6 +117,9 @@ class SetupCommand extends Command
     $this->output->writeln('<comment>Running your tests...</comment>');
 
     $flags = $engine === 'pest' ? '--colors=always' : '';
+    $flags .= $this->input->getOption('flags')
+      ? (' ' . implode(' --', explode(',', $this->input->getOption('flags'))))
+      : '';
 
     $testProcess = Process::fromShellCommandline(
       getcwd() . "/vendor/bin/$engine $flags",
@@ -224,6 +227,7 @@ class SetupCommand extends Command
       $actionsToWrite = [];
       $database = Core::get('tests')['database'] ?? false;
       $actionsCoverage = ($config['tests']['coverage']['actions'] ?? true) ? 'xdebug' : 'none';
+      $coverageFlags = $actionsCoverage !== 'none' ? ' -- --flags=coverage' : '';
 
       if ($database) {
         $dbName = $database['connection']['name'] ?? 'test';
@@ -261,8 +265,8 @@ class SetupCommand extends Command
         $actionStub = \Leaf\FS::readFile(dirname(__DIR__) . "/setup/workflows/$action.yml");
 
         $actionStub = str_replace(
-          ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS'],
-          [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false', $actionsCoverage, implode("\n", $actionsToWrite)],
+          ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS', 'ACTIONS.STEPS.COVERAGE'],
+          [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false', $actionsCoverage, implode("\n", $actionsToWrite), $coverageFlags],
           $actionStub
         );
 
