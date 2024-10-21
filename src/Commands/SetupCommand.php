@@ -134,6 +134,12 @@ class SetupCommand extends Command
 
     \Leaf\FS::deleteFile(getcwd() . '/phpunit.xml');
 
+    if (!$testProcess->isSuccessful()) {
+      $this->output->writeln('<error>Tests failed. Check your code and try again.</error>');
+
+      return 1;
+    }
+
     return 0;
   }
 
@@ -169,7 +175,7 @@ class SetupCommand extends Command
 
     $this->output->writeln("<comment>Running linter...</comment>\n");
 
-    $testProcess = Process::fromShellCommandline(
+    $lintProcess = Process::fromShellCommandline(
       getcwd() . '/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes',
       null,
       null,
@@ -179,14 +185,20 @@ class SetupCommand extends Command
 
     // $testProcess->setTty(true);
 
-    $testProcess->run(function ($type, $line): void {
+    $lintProcess->run(function ($type, $line): void {
       $this->output->write($line);
     });
 
     \Leaf\FS::deleteFile(getcwd() . '/.php_cs.dist.php');
-
+    
     if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
       \Leaf\FS::moveFile(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
+    }
+    
+    if (!$lintProcess->isSuccessful()) {
+      $this->output->writeln('<error>Linting failed. Check your code and try again.</error>');
+
+      return 1;
     }
 
     return 0;
