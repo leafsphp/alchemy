@@ -28,7 +28,8 @@ class SetupCommand extends Command
       ->addOption('lint', 'l', InputOption::VALUE_NONE, 'Run only linter')
       ->addOption('test', 't', InputOption::VALUE_NONE, 'Run only tests')
       ->addOption('actions', 'gh', InputOption::VALUE_NONE, 'Generate GitHub actions')
-      ->addOption('force', 'f', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists');
+      ->addOption('force', 'f', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists')
+      ->addOption('flags', null, InputOption::VALUE_NONE, 'Add flags to the command being run');
   }
 
   /**
@@ -200,11 +201,47 @@ class SetupCommand extends Command
 
     foreach ($actionToRun as $action) {
       $actionFile = getcwd() . "/.github/workflows/$action.yml";
+
       $phpVersions = $config['php']['versions'] ?? ['8.3'];
       $phpExtensions = $config['php']['extensions'] ?? 'json, zip';
+
       $os = $config['os'] ?? ['ubuntu-latest'];
       $events = $config['events'] ?? ['push'];
       $failFast = $config['fail-fast'] ?? true;
+
+      $actionsToWrite = [];
+      $database = Core::get('tests')['database'] ?? false;
+      $actionsCoverage = ($config['tests']['coverage']['actions'] ?? true) ? 'xdebug' : 'none';
+
+      if ($database) {
+        $dbName = $database['connection']['name'] ?? 'test';
+        $dbUser = $database['connection']['username'] ?? 'root';
+        $dbPassword = $database['connection']['password'] ?? '';
+        $dbPort = $database['connection']['port'] ?? 3306;
+
+        if ($database['type'] === 'mysql') {
+          $actionsToWrite[] = "\n
+      - name: Boot MySQL
+        run: sudo systemctl start mysql.service";
+
+          $actionsToWrite[] = "
+      - name: Initialize database
+        run: |
+          mysql -e 'CREATE DATABASE $dbName;' \
+          -u$dbUser -p$dbPassword -P$dbPort";
+        } else if ($database['type'] === 'pgsql') {
+          $actionsToWrite[] = "\n
+      - name: Iniitialize Database
+        uses: ikalnytskyi/action-setup-postgres@v6
+        with:
+          username: $dbUser
+          password: $dbPassword
+          database: $dbName
+          port: $dbPort
+          ssl: on
+        id: postgres";
+        }
+      }
 
       if (!file_exists($actionFile)) {
         $this->output->writeln("<info>Writing GitHub action $action.yml...</info>");
@@ -212,8 +249,8 @@ class SetupCommand extends Command
         $actionStub = \Leaf\FS::readFile(dirname(__DIR__) . "/setup/workflows/$action.yml");
 
         $actionStub = str_replace(
-          ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST'],
-          [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false'],
+          ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS'],
+          [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false', $actionsCoverage, implode("\n", $actionsToWrite)],
           $actionStub
         );
 

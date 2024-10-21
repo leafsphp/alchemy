@@ -10,7 +10,8 @@ tests:
   files:
     - '*.test.php'
   coverage:
-    processUncoveredFiles: true
+    local: false
+    actions: true
 
 lint:
   preset: PSR12
