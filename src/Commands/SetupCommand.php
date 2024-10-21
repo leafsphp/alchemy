@@ -118,7 +118,7 @@ class SetupCommand extends Command
 
     $flags = $engine === 'pest' ? '--colors=always' : '';
     $flags .= $this->input->getOption('flags')
-      ? (' ' . implode(' --', explode(',', $this->input->getOption('flags'))))
+      ? (' --' . implode(' --', explode(',', $this->input->getOption('flags'))))
       : '';
 
     $testProcess = Process::fromShellCommandline(
