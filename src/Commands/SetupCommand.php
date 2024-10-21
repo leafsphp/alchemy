@@ -29,7 +29,7 @@ class SetupCommand extends Command
       ->addOption('test', 't', InputOption::VALUE_NONE, 'Run only tests')
       ->addOption('actions', 'gh', InputOption::VALUE_NONE, 'Generate GitHub actions')
       ->addOption('force', 'f', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists')
-      ->addOption('flags', null, InputOption::VALUE_NONE, 'Add flags to the command being run');
+      ->addOption('flags', null, InputOption::VALUE_OPTIONAL, 'Add flags to the command being run separated by commas');
   }
 
   /**
