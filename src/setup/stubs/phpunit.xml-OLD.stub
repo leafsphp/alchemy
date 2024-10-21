@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="CONFIG.XMLNSXSI" xsi:noNamespaceSchemaLocation="CONFIG.NONSLOCATION" bootstrap="CONFIG.BOOTSTRAP"
+	colors="CONFIG.COLORS" cacheDirectory=".alchemy">
+	<testsuites>
+		CONFIG.TESTSUITES
+	</testsuites>
+	<source>
+		<include>
+			COVERAGE.INCLUDES
+		</include>
+	</source>
+	<coverage processUncoveredFiles="COVERAGE.PROCESSUNCOVEREDFILES">
+		<include>
+			COVERAGE.INCLUDES
+		</include>
+	</coverage>
+</phpunit>

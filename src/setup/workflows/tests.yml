@@ -1,0 +1,32 @@
+name: Run Tests
+
+on: ACTIONS.EVENTS
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: ACTIONS.FAILFAST
+      matrix:
+        os: ACTIONS.OS
+        php: ACTIONS.PHP.VERSIONS
+
+    name: PHP ${{ matrix.php }} - ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2ACTIONS.PHP.ACTIONS
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ACTIONS.PHP.EXTENSIONS
+          tools: composer:v2
+          coverage: ACTIONS.PHP.COVERAGE
+
+      - name: Install PHP dependencies
+        run: composer update --no-interaction --no-progress
+
+      - name: Run Tests
+        run: composer run testACTIONS.STEPS.COVERAGE
