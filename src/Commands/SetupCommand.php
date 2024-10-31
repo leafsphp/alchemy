@@ -137,6 +137,10 @@ class SetupCommand extends Command
 
     \Leaf\FS::deleteFile(getcwd() . '/phpunit.xml');
 
+    if (file_exists(getcwd() . '/.phpunit.result.cache')) {
+      \Leaf\FS::moveFile(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
+    }
+
     if (!$testProcess->isSuccessful()) {
       $this->output->writeln('<error>Tests failed. Check your code and try again.</error>');
 

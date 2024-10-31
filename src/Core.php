@@ -39,6 +39,10 @@ class Core
     {
         $config = static::get();
 
+        if (file_exists(getcwd() . '/.alchemy/.phpunit.result.cache')) {
+          \Leaf\FS::moveFile(getcwd() . '/.alchemy/.phpunit.result.cache', getcwd() . '/.phpunit.result.cache');
+        }
+
         $appPathsConfig = $config['app'] ?? [__DIR__];
         $testSuiteConfig = $config['tests']['paths'] ?? ['tests'];
         $testCoverageFiles = $config['tests']['coverage']['processUncoveredFiles'] ?? true;
@@ -67,6 +71,7 @@ class Core
 
         \Leaf\FS::writeFile(getcwd() . '/phpunit.xml', $phpunitXml);
     }
+
     public static function generateLintFiles()
     {
         $config = static::get();
