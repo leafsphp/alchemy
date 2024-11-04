@@ -1,8 +1,7 @@
 <!-- markdownlint-disable no-inline-html -->
 <p align="center">
     <br><br>
-    <img src="https://leafphp.dev/logo-circle.png" height="100"/>
-    <br><br>
+    <img src="https://github.com/user-attachments/assets/3a50d848-4290-4a46-8ab1-bc0a148da375" height="100"/>
 </p>
 
 <h1 align="center">Alchemy</h1>
@@ -11,41 +10,76 @@
 [![Total Downloads](https://poser.pugx.org/leafs/alchemy/downloads)](https://packagist.org/packages/leafs/alchemy)
 [![License](https://poser.pugx.org/leafs/alchemy/license)](https://packagist.org/packages/leafs/alchemy)
 
-Alchemy is a Leaf module which allows you to quickly and efficiently create and run tests in your Leaf apps. Leaf 3 is built with testing in mind. In fact, support for testing with Pest PHP/PHPUnit is included out of the box. However, Alchemy allows you to avoid all the hustle and write your tests without having to setup anything. Just run the setup script and run your tests without any config or anything like that.
+Alchemy is an integrated testing/style fixing tool for your PHP applications. Alchemy handles your test/linting setup and any other integration you might need to run your tests like CI/CD. Alchemy is not a testing framework or style fixer, it's a tool that manages all the nasty setup for you.
 
-## 📦 Installation
+## 📦 Setting Up
 
-You can quickly install alchemy with leaf CLI
+You can install alchemy with leaf CLI
 
-```sh
+```bash
 leaf install alchemy
 ```
 
 Or with composer
 
-```sh
+```bash
 composer require leafs/alchemy
 ```
 
-## 🗂 Your First Test
+Once installed, Alchemy will automatically set up an `alchemy.yml` file in your project's root which you can use to configure your tests, linting and github actions.
 
-After installing Alchemy, simply run the setup script
+## 🗂 Your Alchemy File
 
-```sh
-./vendor/bin/alchemy setup
+The `alchemy.yml` file should look something like this:
+
+```yaml
+app:
+  - app
+  - src
+
+tests:
+  engine: pest
+  parallel: true
+  paths:
+    - tests
+  files:
+    - '*.test.php'
+  coverage:
+    processUncoveredFiles: true
+
+lint:
+  preset: 'PSR12'
+  ignore_dot_files: true
+  rules:
+    array_syntax:
+      syntax: 'short'
+    no_unused_imports: true
+    single_quote: true
+    ordered_imports:
+      imports_order: null
+      case_sensitive: false
+      sort_algorithm: 'alpha'
+
+actions:
+  run:
+    - 'lint'
+    - 'test'
+  php:
+    extensions: json, zip
+    versions:
+      - '8.3'
+  event:
+    - 'push'
+    - 'pull_request'
 ```
 
-This uses Pest PHP by default. If you want to use PHPUnit, you can add the `--phpunit` option to the setup script.
+You can make edits to this file to suit your needs. The `app` key is an array of directories to look for your app files in. The `tests` key is an array of configurations for your tests. The `lint` key is an array of configurations for your code styling checks. Once you're done setting up your `alchemy.yml` file, you can run the setup script.
 
-```sh
-./vendor/bin/alchemy setup --phpunit
+```bash
+leaf run alchemy # or composer run alchemy
 ```
 
-This will setup dummy tests and an `alchemy.config.php` file which you can use to gain a little more control over your tests. After writing the tests you need to write, you can simply run the test script.
-
-```sh
-./vendor/bin/alchemy run
-```
+This will install your test engine, PHP CS Fixer and any other dependencies you might need, and then generate dummy tests using the test engine you chose. It will then lint your code, run your tests and generate a coverage report (if you selected that option). It will also add a `test` and `lint` command to your `composer.json` file which you can use to run your tests and lint your code respectively. Finally, it will generate a `.github/workflows` directory with a `test.yml` file and a `lint.yml` file which you can use to run your tests and linting on github actions.
 
 Based on your engine, you might see either of the outputs below
 
@@ -56,85 +90,3 @@ Based on your engine, you might see either of the outputs below
 - PHPUnit
 
 <img width="770" alt="image" src="https://user-images.githubusercontent.com/26604242/182198446-47a4a581-3aa4-470c-b450-420604b9bb6c.png">
-
-> Alchemy is a test runner, not a testing framework.
-
-### Commands
-
-<img width="723" alt="image" src="https://user-images.githubusercontent.com/26604242/182193129-b76bfcda-c74e-4458-801b-650939ed2f5f.png">
-
-## 💬 Stay In Touch
-
-- [Twitter](https://twitter.com/leafphp)
-- [Join the forum](https://github.com/leafsphp/leaf/discussions/37)
-- [Chat on discord](https://discord.com/invite/Pkrm9NJPE3)
-
-## 📓 Learning Leaf 3
-
-- Leaf has a very easy to understand [documentation](https://leafphp.dev) which contains information on all operations in Leaf.
-- You can also check out our [youtube channel](https://www.youtube.com/channel/UCllE-GsYy10RkxBUK0HIffw) which has video tutorials on different topics
-- We are also working on codelabs which will bring hands-on tutorials you can follow and contribute to.
-
-## 😇 Contributing
-
-We are glad to have you. All contributions are welcome! To get started, familiarize yourself with our [contribution guide](https://leafphp.dev/community/contributing.html) and you'll be ready to make your first pull request 🚀.
-
-To report a security vulnerability, you can reach out to [@mychidarko](https://twitter.com/mychidarko) or [@leafphp](https://twitter.com/leafphp) on twitter. We will coordinate the fix and eventually commit the solution in this project.
-
-### Code contributors
-
-<table>
-	<tr>
-		<td align="center">
-			<a href="https://github.com/mychidarko">
-				<img src="https://avatars.githubusercontent.com/u/26604242?v=4" width="120px" alt=""/>
-				<br />
-				<sub>
-					<b>Michael Darko</b>
-				</sub>
-			</a>
-		</td>
-	</tr>
-</table>
-
-## 🤩 Sponsoring Leaf
-
-Your cash contributions go a long way to help us make Leaf even better for you. You can sponsor Leaf and any of our packages on [open collective](https://opencollective.com/leaf) or check the [contribution page](https://leafphp.dev/support/) for a list of ways to contribute.
-
-And to all our existing cash/code contributors, we love you all ❤️
-
-### Cash contributors
-
-<table>
-	<tr>
-		<td align="center">
-			<a href="https://opencollective.com/aaron-smith3">
-				<img src="https://images.opencollective.com/aaron-smith3/08ee620/avatar/256.png" width="120px" alt=""/>
-				<br />
-				<sub><b>Aaron Smith</b></sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="https://opencollective.com/peter-bogner">
-				<img src="https://images.opencollective.com/peter-bogner/avatar/256.png" width="120px" alt=""/>
-				<br />
-				<sub><b>Peter Bogner</b></sub>
-			</a>
-		</td>
-		<td align="center">
-			<a href="#">
-				<img src="https://images.opencollective.com/guest-32634fda/avatar.png" width="120px" alt=""/>
-				<br />
-				<sub><b>Vano</b></sub>
-			</a>
-		</td>
-	</tr>
-</table>
-
-## 🤯 Links/Projects
-
-- [Leaf Docs](https://leafphp.dev)
-- [Leaf MVC](https://mvc.leafphp.dev)
-- [Leaf API](https://api.leafphp.dev)
-- [Leaf CLI](https://cli.leafphp.dev)
-- [Aloe CLI](https://leafphp.dev/aloe-cli/)
