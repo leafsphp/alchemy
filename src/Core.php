@@ -40,7 +40,7 @@ class Core
         $config = static::get();
 
         if (file_exists(getcwd() . '/.alchemy/.phpunit.result.cache')) {
-          \Leaf\FS::moveFile(getcwd() . '/.alchemy/.phpunit.result.cache', getcwd() . '/.phpunit.result.cache');
+            \Leaf\FS\File::move(getcwd() . '/.alchemy/.phpunit.result.cache', getcwd() . '/.phpunit.result.cache');
         }
 
         $appPathsConfig = $config['app'] ?? [__DIR__];
@@ -62,14 +62,14 @@ class Core
             $coverageIncludes .= "<directory suffix=\".php\">$appDir</directory>";
         }
 
-        $phpunitXml = \Leaf\FS::readFile(__DIR__ . '/setup/stubs/phpunit.xml.stub');
+        $phpunitXml = \Leaf\FS\File::read(__DIR__ . '/setup/stubs/phpunit.xml.stub');
         $phpunitXml = str_replace(
             ['CONFIG.XMLNSXSI', 'CONFIG.NONSLOCATION', 'CONFIG.BOOTSTRAP', 'CONFIG.COLORS', 'CONFIG.TESTSUITES', 'COVERAGE.PROCESSUNCOVEREDFILES', 'COVERAGE.INCLUDES'],
             [$xmlnsXsi, $nsLocation, $bootstrap, $colors ? 'true' : 'false', $testSuites, $testCoverageFiles ? 'true' : 'false', $coverageIncludes],
             $phpunitXml
         );
 
-        \Leaf\FS::writeFile(getcwd() . '/phpunit.xml', $phpunitXml);
+        \Leaf\FS\File::create(getcwd() . '/phpunit.xml', $phpunitXml);
     }
 
     public static function generateLintFiles()
@@ -77,7 +77,7 @@ class Core
         $config = static::get();
 
         if (file_exists(getcwd() . '/.alchemy/.php-cs-fixer.cache')) {
-            \Leaf\FS::moveFile(getcwd() . '/.alchemy/.php-cs-fixer.cache', getcwd() . '/.php-cs-fixer.cache');
+            \Leaf\FS\File::move(getcwd() . '/.alchemy/.php-cs-fixer.cache', getcwd() . '/.php-cs-fixer.cache');
         }
 
         $lintConfig = $config['lint'];
@@ -99,13 +99,13 @@ class Core
             $lintPaths = ['__DIR__'];
         }
 
-        $phpcsFixerDist = \Leaf\FS::readFile(__DIR__ . '/setup/stubs/.php_cs.dist.php.stub');
+        $phpcsFixerDist = \Leaf\FS\File::read(__DIR__ . '/setup/stubs/.php_cs.dist.php.stub');
         $phpcsFixerDist = str_replace(
             ['LINT.PATHS', 'LINT.IGNORE_DOT_FILES', 'LINT.IGNORE_VC_FILES', 'LINT.RULES', 'LINT.PARALLEL'],
             [static::unJsonify($lintPaths), $ignoreDotFiles, $ignoreVCFiles, static::unJsonify($lintRules), $lintParallel],
             $phpcsFixerDist
         );
 
-        \Leaf\FS::writeFile(getcwd() . '/.php_cs.dist.php', $phpcsFixerDist);
+        \Leaf\FS\File::create(getcwd() . '/.php_cs.dist.php', $phpcsFixerDist);
     }
 }

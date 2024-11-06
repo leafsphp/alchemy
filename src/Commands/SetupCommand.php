@@ -45,7 +45,7 @@ class SetupCommand extends Command
     $this->output = $output;
 
     Core::set(Yaml::parseFile(getcwd() . '/alchemy.yml'));
-    \Leaf\FS::createFolder(getcwd() . '/.alchemy');
+    \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
 
     if ($input->getOption('test')) {
       return $this->runTests();
@@ -106,10 +106,20 @@ class SetupCommand extends Command
     if (!is_dir(getcwd() . '/' . ($config['paths'][0] ?? '/tests'))) {
       $this->output->writeln('<info>Writing sample tests...</info>');
 
-      \Leaf\FS::superCopy(
-        dirname(__DIR__) . "/setup/$engine",
-        getcwd(),
-      );
+      if (
+        !\Leaf\FS\Directory::copy(
+          dirname(__DIR__) . "/setup/$engine",
+          getcwd(),
+          [
+            'recursive' => true,
+          ]
+        )
+      ) {
+        $errors = json_encode(\Leaf\FS\Directory::errors(), JSON_PRETTY_PRINT);
+        $this->output->writeln("<error>Couldn't write sample tests. $errors</error>");
+
+        return 1;
+      }
     }
 
     Core::generateTestFiles();
@@ -135,10 +145,10 @@ class SetupCommand extends Command
       $this->output->write($line);
     });
 
-    \Leaf\FS::deleteFile(getcwd() . '/phpunit.xml');
+    \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
 
     if (file_exists(getcwd() . '/.phpunit.result.cache')) {
-      \Leaf\FS::moveFile(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
+      \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
     }
 
     if (!$testProcess->isSuccessful()) {
@@ -196,12 +206,12 @@ class SetupCommand extends Command
       $this->output->write($line);
     });
 
-    \Leaf\FS::deleteFile(getcwd() . '/.php_cs.dist.php');
-    
+    \Leaf\FS\File::delete(getcwd() . '/.php_cs.dist.php');
+
     if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
-      \Leaf\FS::moveFile(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
+      \Leaf\FS\File::move(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
     }
-    
+
     if (!$lintProcess->isSuccessful()) {
       $this->output->writeln('<error>Linting failed. Check your code and try again.</error>');
 
@@ -216,7 +226,7 @@ class SetupCommand extends Command
     $config = Core::get('actions');
     $actionToRun = $config['run'] ?? [];
 
-    \Leaf\FS::createFolder(getcwd() . '/.github');
+    \Leaf\FS\Directory::create(getcwd() . '/.github');
 
     foreach ($actionToRun as $action) {
       $actionFile = getcwd() . "/.github/workflows/$action.yml";
@@ -266,7 +276,7 @@ class SetupCommand extends Command
       if (!file_exists($actionFile)) {
         $this->output->writeln("<info>Writing GitHub action $action.yml...</info>");
 
-        $actionStub = \Leaf\FS::readFile(dirname(__DIR__) . "/setup/workflows/$action.yml");
+        $actionStub = \Leaf\FS\File::read(dirname(__DIR__) . "/setup/workflows/$action.yml");
 
         $actionStub = str_replace(
           ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS', 'ACTIONS.STEPS.COVERAGE'],
@@ -274,7 +284,7 @@ class SetupCommand extends Command
           $actionStub
         );
 
-        \Leaf\FS::writeFile($actionFile, $actionStub);
+        \Leaf\FS\File::write($actionFile, $actionStub);
       }
     }
 
