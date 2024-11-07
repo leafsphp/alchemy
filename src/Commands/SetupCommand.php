@@ -284,7 +284,9 @@ class SetupCommand extends Command
           $actionStub
         );
 
-        \Leaf\FS\File::write($actionFile, $actionStub);
+        \Leaf\FS\File::create($actionFile, $actionStub, [
+          'recursive' => true,
+        ]);
       }
     }
 
