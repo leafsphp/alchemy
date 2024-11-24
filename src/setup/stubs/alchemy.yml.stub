@@ -1,6 +1,5 @@
 app:
     - app
-    - src
 
 tests:
     engine: ALCHEMY.ENGINE
