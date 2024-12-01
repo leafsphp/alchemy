@@ -75,17 +75,20 @@ class Core
     public static function generateLintFiles()
     {
         $config = static::get();
+        $lintConfig = $config['lint'];
 
         if (file_exists(getcwd() . '/.alchemy/.php-cs-fixer.cache')) {
             \Leaf\FS\File::move(getcwd() . '/.alchemy/.php-cs-fixer.cache', getcwd() . '/.php-cs-fixer.cache');
         }
 
-        $lintConfig = $config['lint'];
         $lintRules = $lintConfig['rules'] ?? [];
         $lintPreset = $lintConfig['preset'] ?? 'PSR12';
+
+        $ignoreTests = json_encode($lintConfig['ignore_tests'] ?? false, JSON_PRETTY_PRINT);
         $ignoreVCFiles = json_encode($lintConfig['ignore_vc_files'] ?? true, JSON_PRETTY_PRINT);
         $ignoreDotFiles = json_encode($lintConfig['ignore_dot_files'] ?? true, JSON_PRETTY_PRINT);
-        $appPathsConfig = $config['app'] ? array_merge($config['app'], $config['tests']['paths'] ?? []) : null;
+
+        $appPathsConfig = $config['app'] ? array_merge($config['app'], $ignoreTests ? [] : ($config['tests']['paths'] ?? [])) : null;
         $lintParallel = ($lintConfig['parallel'] ?? false) ? "\n->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())" : '';
 
         $lintPaths = [];
