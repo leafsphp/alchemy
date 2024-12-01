@@ -1,6 +1,6 @@
 {
 	"name": "leafs/alchemy",
-	"version": "2.1.2",
+	"version": "2.2",
 	"description": "Integrated testing/style fixing tool for your PHP apps",
 	"homepage": "https://leafphp.dev/docs/tooling/testing",
 	"keywords": [
