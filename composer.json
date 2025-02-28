@@ -22,7 +22,7 @@
 	],
 	"require": {
 		"ext-json": "*",
-		"leafs/fs": "^2.0",
+		"leafs/fs": "*",
 		"symfony/console": "*",
 		"symfony/process": "*",
 		"symfony/yaml": "*"
