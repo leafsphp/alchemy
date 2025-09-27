@@ -3,71 +3,50 @@
 namespace Leaf\Alchemy\Commands;
 
 use Leaf\Alchemy\Core;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\Process;
+use Leaf\Sprout\Command;
 use Symfony\Component\Yaml\Yaml;
 
 class SetupCommand extends Command
 {
-    protected $output;
-    protected $input;
-
-    /**
-     * Configure the command options.
-     *
-     * @return void
-     */
-    protected function configure()
-    {
-        $this
-            ->setName('setup')
-            ->setDescription('Setup work environment based on Alchemy configuration')
-            ->addOption('lint', 'l', InputOption::VALUE_NONE, 'Run only linter')
-            ->addOption('test', 't', InputOption::VALUE_NONE, 'Run only tests')
-            ->addOption('actions', 'gh', InputOption::VALUE_NONE, 'Generate GitHub actions')
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Replace test or tests folder if it exists')
-            ->addOption('flags', null, InputOption::VALUE_OPTIONAL, 'Add flags to the command being run separated by commas');
-    }
+    protected $signature = 'setup
+        {--l|lint? : Run only linter}
+        {--t|test? : Run only tests}
+        {--gh|actions? : Generate GitHub actions}
+        {--f|force? : Replace test or tests folder if it exists}
+        {--flags? : Add flags to the command being run separated by commas}';
+    protected $description = 'Setup work environment based on Alchemy configuration';
+    protected $help = 'This command will help you setup your work environment based on the alchemy.yml configuration file.';
 
     /**
      * Execute the command.
-     *
-     * @param InputInterface $input
-     * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    protected function handle(): int
     {
-        $this->input = $input;
-        $this->output = $output;
-
-
         Core::set(Yaml::parseFile(getcwd() . '/alchemy.yml'));
+
         \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
 
-        if ($input->getOption('test')) {
+        if ($this->option('test')) {
             set_time_limit(0);
             return $this->runTests();
         }
 
-        if ($input->getOption('lint')) {
+        if ($this->option('lint')) {
             return $this->runLinter();
         }
 
-        if ($input->getOption('actions')) {
+        if ($this->option('actions')) {
             return $this->generateActions();
         }
 
-        if (!$input->getOption('test') && !$input->getOption('lint') && !$input->getOption('actions')) {
+        if (!$this->option('test') && !$this->option('lint') && !$this->option('actions')) {
             $this->runTests();
             $this->runLinter();
             $this->generateActions();
         }
 
-        $output->writeln('<info>Alchemy setup successfully.</info>');
+        $this->writeln('<info>Alchemy setup successfully.</info>');
 
         return 0;
     }
@@ -81,45 +60,28 @@ class SetupCommand extends Command
         $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --with-all-dependencies' : '\'phpunit/phpunit:*\'';
 
         if (!file_exists(getcwd() . "/vendor/bin/$engine")) {
-            $engineInstallProcess = Process::fromShellCommandline(
-                "composer require $engineInstaller --dev",
-                null,
-                null,
-                null,
-                null
-            );
+            $this->writeln("<info>Setting up tests with $engine...</info>\n");
 
-            // $engineInstallProcess->setTty(true);
-
-            $this->output->writeln("<info>Setting up tests with $engine...</info>\n");
-
-            $engineInstallProcess->run(function ($type, $line) {
-                $this->output->write($line);
-            });
-
-            if (!$engineInstallProcess->isSuccessful()) {
-                $this->output->writeln("<error>Couldn\'t install $engine. Check your connection and try again.</error>");
-
+            if (!sprout()->composer()->install("composer require $engineInstaller --dev")->isSuccessful()) {
+                $this->writeln("<error>Couldn\'t install $engine. Check your connection and try again.</error>");
                 return 1;
             }
 
-            $this->output->writeln("<info>$engine installed successfully!</info>");
+            $this->writeln("<info>$engine installed successfully!</info>");
         }
 
-        if (!is_dir(getcwd() . '/' . ($config['paths'][0] ?? '/tests'))) {
-            $this->output->writeln('<info>Writing sample tests...</info>');
+        if (!\Leaf\FS\Directory::exists(getcwd() . '/' . ($config['paths'][0] ?? '/tests'))) {
+            $this->writeln('<info>Writing sample tests...</info>');
 
             if (
                 !\Leaf\FS\Directory::copy(
                     dirname(__DIR__) . "/setup/$engine",
                     getcwd(),
-                    [
-                        'recursive' => true,
-                    ]
+                    ['recursive' => true]
                 )
             ) {
                 $errors = json_encode(\Leaf\FS\Directory::errors(), JSON_PRETTY_PRINT);
-                $this->output->writeln("<error>Couldn't write sample tests. $errors</error>");
+                $this->writeln("<error>Couldn't write sample tests. $errors</error>");
 
                 return 1;
             }
@@ -127,31 +89,23 @@ class SetupCommand extends Command
 
         Core::generateTestFiles();
 
-        $this->output->writeln("<comment>  > Using $engine for tests ...</comment>");
+        $this->writeln("<comment>  > Using $engine for tests ...</comment>");
 
         $flags = $engine === 'pest' ? '--colors=always' : '';
-        $flags .= $this->input->getOption('flags')
-            ? (' --' . implode(' --', explode(',', $this->input->getOption('flags'))))
+        $flags .= $this->option('flags')
+            ? (' --' . implode(' --', explode(',', $this->option('flags'))))
             : '';
 
         if ($parallel) {
-            $this->output->writeln("<info>  > Running tests in parallel...</info>");
+            $this->writeln("<info>  > Running tests in parallel...</info>");
             $flags .= $engine === 'pest' ? ' --parallel' : ' --parallel';
         }
 
-        $testProcess = Process::fromShellCommandline(
-            getcwd() . "/vendor/bin/$engine $flags",
-            null,
-            null,
-            null,
-            null
-        );
-
-        // $testProcess->setTty(true);
-
-        $testProcess->run(function ($type, $line): void {
-            $this->output->write($line);
-        });
+        $testProcess = sprout()
+            ->process(getcwd() . "/vendor/bin/$engine $flags")
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
 
@@ -159,9 +113,8 @@ class SetupCommand extends Command
             \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
         }
 
-        if (!$testProcess->isSuccessful()) {
-            $this->output->writeln('<error>Tests failed. Check your code and try again.</error>');
-
+        if ($testProcess === 1) {
+            $this->writeln('<error>Tests failed. Check your code and try again.</error>');
             return 1;
         }
 
@@ -171,48 +124,25 @@ class SetupCommand extends Command
     protected function runLinter()
     {
         if (!file_exists(getcwd() . '/vendor/bin/php-cs-fixer')) {
-            $engineInstallProcess = Process::fromShellCommandline(
-                'composer require friendsofphp/php-cs-fixer --dev',
-                null,
-                null,
-                null,
-                null
-            );
+            $this->writeln("<info>Setting up linting with php-cs-fixer...</info>\n");
 
-            // $engineInstallProcess->setTty(true);
-
-            $this->output->writeln("<info>Setting up linting with php-cs-fixer...</info>\n");
-
-            $engineInstallProcess->run(function ($type, $line) {
-                $this->output->write($line);
-            });
-
-            if (!$engineInstallProcess->isSuccessful()) {
-                $this->output->writeln('<error>Couldn\'t install PHP-CS-Fixer. Check your connection and try again.</error>');
-
+            if (!sprout()->composer()->install('friendsofphp/php-cs-fixer --dev')->isSuccessful()) {
+                $this->writeln('<error>Couldn\'t install PHP-CS-Fixer. Check your connection and try again.</error>');
                 return 1;
             }
 
-            $this->output->writeln('<info>Linter installed successfully!</info>');
+            $this->writeln('<info>Linter installed successfully!</info>');
         }
 
         Core::generateLintFiles();
 
-        $this->output->writeln("<comment>Running linter...</comment>\n");
+        $this->writeln("<comment>Running linter...</comment>\n");
 
-        $lintProcess = Process::fromShellCommandline(
-            getcwd() . '/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes',
-            null,
-            null,
-            null,
-            null
-        );
-
-        // $testProcess->setTty(true);
-
-        $lintProcess->run(function ($type, $line): void {
-            $this->output->write($line);
-        });
+        $lintProcess = sprout()
+            ->process(getcwd() . '/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes')
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         \Leaf\FS\File::delete(getcwd() . '/.php_cs.dist.php');
 
@@ -220,9 +150,8 @@ class SetupCommand extends Command
             \Leaf\FS\File::move(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
         }
 
-        if (!$lintProcess->isSuccessful()) {
-            $this->output->writeln('<error>Linting failed. Check your code and try again.</error>');
-
+        if ($lintProcess === 1) {
+            $this->writeln('<error>Linting failed. Check your code and try again.</error>');
             return 1;
         }
 
@@ -282,7 +211,7 @@ class SetupCommand extends Command
             }
 
             if (!file_exists($actionFile)) {
-                $this->output->writeln("<info>Writing GitHub action $action.yml...</info>");
+                $this->writeln("<info>Writing GitHub action $action.yml...</info>");
 
                 $actionStub = \Leaf\FS\File::read(dirname(__DIR__) . "/setup/workflows/$action.yml");
 

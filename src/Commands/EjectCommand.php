@@ -2,39 +2,25 @@
 
 namespace Leaf\Alchemy\Commands;
 
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
+use Leaf\Sprout\Command;
 
 class EjectCommand extends Command
 {
-    /**
-     * Configure the command options.
-     *
-     * @return void
-     */
-    protected function configure()
-    {
-        $this
-            ->setName('config:eject')
-            ->setDescription('Switch from alchemy to pest or phpunit');
-    }
+    protected $signature = 'config:eject';
+    protected $description = 'Switch from alchemy to pest or phpunit';
+    protected $help = 'This command will help you switch from alchemy to pest or phpunit by exporting your configuration to a phpunit.xml file and deleting the alchemy.config.php file.';
 
     /**
      * Execute the command.
-     *
-     * @param InputInterface $input
-     * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    protected function handle()
     {
-        $engine = 'pest';
         $configFile = getcwd() . '/alchemy.config.php';
         $config = [];
 
         if (file_exists($configFile)) {
-            $output->writeln('<comment>Using existing alchemy.config.php...</comment>');
+            $this->writeln('<comment>Using existing alchemy.config.php...</comment>');
             $config = require $configFile;
         } else {
             $config = require dirname(__DIR__) . '/setup/pest/alchemy.config.php';

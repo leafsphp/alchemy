@@ -1,6 +1,6 @@
 {
 	"name": "leafs/alchemy",
-	"version": "4.0",
+	"version": "4.2.0",
 	"description": "Integrated testing/style fixing tool for your PHP apps",
 	"homepage": "https://leafphp.dev/docs/tooling/testing",
 	"keywords": [
@@ -23,8 +23,7 @@
 	"require": {
 		"ext-json": "*",
 		"leafs/fs": "*",
-		"symfony/console": "*",
-		"symfony/process": "*",
+		"leafs/sprout": "*",
 		"symfony/yaml": "*"
 	},
 	"bin": [
