@@ -26,4 +26,4 @@ $app->register(new Leaf\Alchemy\Commands\InstallCommand);
 $app->register(new Leaf\Alchemy\Commands\SetupCommand);
 $app->register(new Leaf\Alchemy\Commands\EjectCommand);
 
-exit((int) ($app->run() ?? 0));
+exit((int) ($app->run(false) ?? 0));
