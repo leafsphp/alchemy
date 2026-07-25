@@ -68,7 +68,7 @@ actions:
     extensions: json, zip
     versions:
       - '8.3'
-  event:
+  events:
     - 'push'
     - 'pull_request'
 ```
