@@ -73,7 +73,47 @@ actions:
     - 'pull_request'
 ```
 
-You can make edits to this file to suit your needs. The `app` key is an array of directories to look for your app files in. The `tests` key is an array of configurations for your tests. The `lint` key is an array of configurations for your code styling checks. Once you're done setting up your `alchemy.yml` file, you can run the setup script.
+You can make edits to this file to suit your needs. The `app` key is an array of directories to look for your app files in. The `tests` key is an array of configurations for your tests. The `lint` key is an array of configurations for your code styling checks.
+
+If you need more control, the `tests` key maps (almost) 1:1 to phpunit.xml — named suites, per-suite file patterns and excludes, `<php>` block values, and any root phpunit attribute passed through verbatim via `config`:
+
+```yaml
+tests:
+  engine: pest
+  suites:
+    Unit:
+      paths:
+        - tests/unit
+      exclude:
+        - tests/unit/legacy
+    Feature:
+      paths:
+        - tests/feature
+      files:
+        - '*Test.php'
+  config: # any phpunit.xml attribute, passed through as-is
+    stopOnFailure: true
+    executionOrder: random
+  env:
+    APP_ENV: testing
+  server:
+    MY_FLAG: 'on'
+  ini:
+    memory_limit: 512M
+  coverage:
+    exclude:
+      - src/legacy
+
+lint:
+  preset: PSR12
+  risky: false # risky fixes are on by default
+  exclude:
+    - legacy
+```
+
+Alchemy also respects existing setups: a hand-written `phpunit.xml` in your project is left untouched (alchemy parks it during a run and restores it), and `alchemy eject` exports real config files if you ever want to leave.
+
+Once you're done setting up your `alchemy.yml` file, you can run the setup script.
 
 ```bash
 leaf run alchemy # or composer run alchemy

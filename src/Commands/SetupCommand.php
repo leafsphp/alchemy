@@ -65,12 +65,16 @@ class SetupCommand extends Command
 
         $engine = $config['engine'] ?? 'pest';
         $parallel = $config['parallel'] ?? false;
-        $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --with-all-dependencies' : '\'phpunit/phpunit:*\'';
+        $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --dev --with-all-dependencies' : '\'phpunit/phpunit:*\' --dev';
 
         if (!file_exists(getcwd() . "/vendor/bin/$engine")) {
             $this->writeln("<info>Setting up tests with $engine...</info>\n");
 
-            if (!sprout()->composer()->install("composer require $engineInstaller --dev")->isSuccessful()) {
+            if ($engine === 'pest') {
+                $this->allowPestPlugin();
+            }
+
+            if (!sprout()->composer()->install($engineInstaller)->isSuccessful()) {
                 $this->writeln("<error>Couldn\'t install $engine. Check your connection and try again.</error>");
                 return 1;
             }
@@ -93,6 +97,13 @@ class SetupCommand extends Command
 
                 return 1;
             }
+        }
+
+        // never clobber a hand-written phpunit.xml — park it and restore after the run
+        $userPhpunitConfig = file_exists(getcwd() . '/phpunit.xml');
+
+        if ($userPhpunitConfig) {
+            \Leaf\FS\File::move(getcwd() . '/phpunit.xml', getcwd() . '/.alchemy/phpunit.xml.user');
         }
 
         Core::generateTestFiles();
@@ -134,6 +145,10 @@ class SetupCommand extends Command
         } finally {
             \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
 
+            if ($userPhpunitConfig) {
+                \Leaf\FS\File::move(getcwd() . '/.alchemy/phpunit.xml.user', getcwd() . '/phpunit.xml');
+            }
+
             if (file_exists(getcwd() . '/.phpunit.result.cache')) {
                 \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
             }
@@ -145,6 +160,23 @@ class SetupCommand extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * Composer blocks the pest plugin with an interactive prompt unless it's trusted upfront
+     */
+    protected function allowPestPlugin()
+    {
+        $composerJsonFile = getcwd() . '/composer.json';
+        $appComposerJson = json_decode(file_get_contents($composerJsonFile), true);
+
+        if ($appComposerJson['config']['allow-plugins']['pestphp/pest-plugin'] ?? false) {
+            return;
+        }
+
+        $appComposerJson['config']['allow-plugins']['pestphp/pest-plugin'] = true;
+
+        file_put_contents($composerJsonFile, json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
     protected function runLinter()
@@ -163,13 +195,14 @@ class SetupCommand extends Command
         Core::generateLintFiles();
 
         $check = $this->option('check');
-        $lintFlags = $check ? ' --dry-run --diff' : '';
+        $risky = (Core::get('lint')['risky'] ?? true) ? ' --allow-risky=yes' : '';
+        $lintFlags = $risky . ($check ? ' --dry-run --diff' : '');
 
         $this->writeln($check ? "<comment>Checking code style...</comment>\n" : "<comment>Running linter...</comment>\n");
 
         try {
             $lintProcess = sprout()
-                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes$lintFlags")
+                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php$lintFlags")
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });

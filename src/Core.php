@@ -43,34 +43,136 @@ class Core
             \Leaf\FS\File::move(getcwd() . '/.alchemy/.phpunit.result.cache', getcwd() . '/.phpunit.result.cache');
         }
 
+        $testsConfig = $config['tests'] ?? [];
         $appPathsConfig = $config['app'] ?? [__DIR__];
-        $testSuiteConfig = $config['tests']['paths'] ?? ['tests'];
-        $testCoverageFiles = $config['tests']['coverage']['processUncoveredFiles'] ?? true;
-        $xmlnsXsi = $config['tests']['config']['xmlnxsi'] ?? 'http://www.w3.org/2001/XMLSchema-instance';
-        $nsLocation = $config['tests']['config']['xsi:noNamespaceSchemaLocation'] ?? './vendor/phpunit/phpunit/phpunit.xsd';
-        $bootstrap = $config['tests']['config']['bootstrap'] ?? 'vendor/autoload.php';
-        $colors = $config['tests']['config']['colors'] ?? true;
+
+        // root attributes: sane defaults + verbatim passthrough of tests.config,
+        // so any phpunit.xml attribute maps 1:1 without alchemy needing to know it
+        $attributeOverrides = $testsConfig['config'] ?? [];
+
+        if (isset($attributeOverrides['xmlnxsi'])) {
+            $attributeOverrides['xmlns:xsi'] = $attributeOverrides['xmlnxsi'];
+            unset($attributeOverrides['xmlnxsi']);
+        }
+
+        $attributes = array_merge([
+            'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+            'xsi:noNamespaceSchemaLocation' => './vendor/phpunit/phpunit/phpunit.xsd',
+            'bootstrap' => 'vendor/autoload.php',
+            'colors' => true,
+            'cacheDirectory' => '.alchemy',
+        ], $attributeOverrides);
+
+        $renderedAttributes = [];
+
+        foreach ($attributes as $attribute => $value) {
+            $renderedAttributes[] = $attribute . '="' . static::xmlValue($value) . '"';
+        }
+
+        $renderedAttributes = implode("\n         ", $renderedAttributes);
+
+        // testsuites: simple `paths` list, or fully named suites with
+        // per-suite paths/files/exclude under `tests.suites`
+        $filePatterns = (array) ($testsConfig['files'] ?? ['*.test.php']);
+        $suitesConfig = $testsConfig['suites'] ?? null;
+
+        if (!$suitesConfig) {
+            $suitesConfig = [];
+
+            foreach ($testsConfig['paths'] ?? ['tests'] as $testSuiteDir) {
+                $suitesConfig["Test Suite $testSuiteDir"] = ['paths' => [$testSuiteDir]];
+            }
+        }
 
         $testSuites = '';
-        $coverageIncludes = '';
-        $testFileSuffix = ltrim($config['tests']['files'][0] ?? '*.test.php', '*');
 
-        foreach ($testSuiteConfig as $testSuiteDir) {
-            $testSuites .= "<testsuite name=\"Test Suite $testSuiteDir\"><directory suffix=\"$testFileSuffix\">$testSuiteDir</directory></testsuite>";
+        foreach ($suitesConfig as $suiteName => $suite) {
+            $suite = is_array($suite) ? $suite : ['paths' => [$suite]];
+            $entries = '';
+
+            foreach ((array) ($suite['paths'] ?? []) as $suiteDir) {
+                foreach ((array) ($suite['files'] ?? $filePatterns) as $pattern) {
+                    $suffix = ltrim($pattern, '*');
+                    $entries .= "<directory suffix=\"$suffix\">$suiteDir</directory>";
+                }
+            }
+
+            foreach ((array) ($suite['exclude'] ?? []) as $excluded) {
+                $entries .= "<exclude>$excluded</exclude>";
+            }
+
+            $testSuites .= "<testsuite name=\"$suiteName\">$entries</testsuite>";
         }
+
+        // coverage source
+        $coverageIncludes = '';
+        $coverageExcludes = '';
 
         foreach ($appPathsConfig as $appDir) {
             $coverageIncludes .= "<directory suffix=\".php\">$appDir</directory>";
         }
 
+        foreach ((array) ($testsConfig['coverage']['exclude'] ?? []) as $excluded) {
+            $tag = substr($excluded, -4) === '.php' ? 'file' : 'directory';
+            $coverageExcludes .= "<$tag>$excluded</$tag>";
+        }
+
+        if ($coverageExcludes) {
+            $coverageExcludes = "<exclude>$coverageExcludes</exclude>";
+        }
+
+        // phpunit extensions
+        $extensions = '';
+
+        foreach ((array) ($testsConfig['extensions'] ?? []) as $extensionClass) {
+            $extensions .= "<bootstrap class=\"$extensionClass\"/>";
+        }
+
+        if ($extensions) {
+            $extensions = "<extensions>$extensions</extensions>";
+        }
+
+        // <php> block: env/ini/const/server/get/post/cookie
+        $phpBlock = '';
+        $phpBlockConfig = [
+            'env' => $testsConfig['env'] ?? [],
+            'ini' => $testsConfig['ini'] ?? [],
+            'const' => $testsConfig['const'] ?? [],
+            'server' => $testsConfig['server'] ?? [],
+            'get' => $testsConfig['get'] ?? [],
+            'post' => $testsConfig['post'] ?? [],
+            'cookie' => $testsConfig['cookie'] ?? [],
+        ];
+
+        if (array_filter($phpBlockConfig)) {
+            $phpBlock = '<php>';
+
+            foreach ($phpBlockConfig as $tag => $values) {
+                foreach ($values as $name => $value) {
+                    $phpBlock .= "<$tag name=\"$name\" value=\"" . static::xmlValue($value) . '"/>';
+                }
+            }
+
+            $phpBlock .= '</php>';
+        }
+
         $phpunitXml = \Leaf\FS\File::read(__DIR__ . '/setup/stubs/phpunit.xml.stub');
         $phpunitXml = str_replace(
-            ['CONFIG.XMLNSXSI', 'CONFIG.NONSLOCATION', 'CONFIG.BOOTSTRAP', 'CONFIG.COLORS', 'CONFIG.TESTSUITES', 'COVERAGE.PROCESSUNCOVEREDFILES', 'COVERAGE.INCLUDES'],
-            [$xmlnsXsi, $nsLocation, $bootstrap, $colors ? 'true' : 'false', $testSuites, $testCoverageFiles ? 'true' : 'false', $coverageIncludes],
+            ['CONFIG.ATTRIBUTES', 'CONFIG.TESTSUITES', 'COVERAGE.INCLUDES', 'COVERAGE.EXCLUDES', 'CONFIG.PHPBLOCK', 'CONFIG.EXTENSIONS'],
+            [$renderedAttributes, $testSuites, $coverageIncludes, $coverageExcludes, $phpBlock, $extensions],
             $phpunitXml
         );
 
         \Leaf\FS\File::create(getcwd() . '/phpunit.xml', $phpunitXml);
+    }
+
+    protected static function xmlValue($value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES);
     }
 
     public static function generateLintFiles()
@@ -103,10 +205,16 @@ class Core
             $lintPaths = ['__DIR__'];
         }
 
+        $lintExcludes = '';
+
+        if (!empty($lintConfig['exclude'])) {
+            $lintExcludes = "\n  ->exclude(" . static::unJsonify((array) $lintConfig['exclude']) . ')';
+        }
+
         $phpcsFixerDist = \Leaf\FS\File::read(__DIR__ . '/setup/stubs/.php_cs.dist.php.stub');
         $phpcsFixerDist = str_replace(
-            ['LINT.PATHS', 'LINT.IGNORE_DOT_FILES', 'LINT.IGNORE_VC_FILES', 'LINT.RULES', 'LINT.PARALLEL'],
-            [static::unJsonify($lintPaths), $ignoreDotFiles, $ignoreVCFiles, static::unJsonify($lintRules), $lintParallel],
+            ['LINT.PATHS', 'LINT.IGNORE_DOT_FILES', 'LINT.IGNORE_VC_FILES', 'LINT.RULES', 'LINT.PARALLEL', 'LINT.EXCLUDES'],
+            [static::unJsonify($lintPaths), $ignoreDotFiles, $ignoreVCFiles, static::unJsonify($lintRules), $lintParallel, $lintExcludes],
             $phpcsFixerDist
         );
 
