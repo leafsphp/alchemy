@@ -111,6 +111,21 @@ lint:
     - legacy
 ```
 
+Alchemy can also manage [Rector](https://getrector.com) for automated refactoring. Add a `refactor` section and run `composer run refactor` (or `-- --check` in CI to fail on pending refactors — add `refactor` to `actions.run` to generate the workflow):
+
+```yaml
+refactor:
+  php: '8.2' # upgrade sets targeting this PHP version (true = read from composer.json)
+  sets: # rector's prepared sets
+    - dead-code
+    - code-quality
+    - type-declarations
+  skip:
+    - src/legacy
+```
+
+Rector only joins the full `alchemy setup` pipeline when a `refactor` section exists — a tool that rewrites your code should be opted into.
+
 Alchemy also respects existing setups: a hand-written `phpunit.xml` in your project is left untouched (alchemy parks it during a run and restores it), and `alchemy eject` exports real config files if you ever want to leave.
 
 Once you're done setting up your `alchemy.yml` file, you can run the setup script.

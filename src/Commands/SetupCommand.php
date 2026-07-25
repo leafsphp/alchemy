@@ -11,8 +11,9 @@ class SetupCommand extends Command
     protected $signature = 'setup
         {--l|lint? : Run only linter}
         {--t|test? : Run only tests}
+        {--r|refactor? : Run only rector refactors}
         {--gh|actions? : Generate GitHub actions}
-        {--c|check? : Check code style without fixing anything (used in CI)}
+        {--c|check? : Check without changing anything (used in CI)}
         {--f|force? : Replace test or tests folder if it exists}
         {--flags? : Add flags to the command being run separated by commas}';
     protected $description = 'Setup work environment based on Alchemy configuration';
@@ -44,13 +45,23 @@ class SetupCommand extends Command
             return $this->runLinter();
         }
 
+        if ($this->option('refactor')) {
+            return $this->runRefactor();
+        }
+
         if ($this->option('actions')) {
             return $this->generateActions();
         }
 
-        if (!$this->option('test') && !$this->option('lint') && !$this->option('actions')) {
+        if (!$this->option('test') && !$this->option('lint') && !$this->option('refactor') && !$this->option('actions')) {
             $this->runTests();
             $this->runLinter();
+
+            // rector rewrites code, so it only joins the pipeline when configured
+            if (Core::get('refactor')) {
+                $this->runRefactor();
+            }
+
             $this->generateActions();
         }
 
@@ -177,6 +188,50 @@ class SetupCommand extends Command
         $appComposerJson['config']['allow-plugins']['pestphp/pest-plugin'] = true;
 
         file_put_contents($composerJsonFile, json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    protected function runRefactor()
+    {
+        if (!Core::get('refactor')) {
+            $this->writeln('<comment>No `refactor` section found in alchemy.yml. Add one to use Rector.</comment>');
+            return 0;
+        }
+
+        if (!file_exists(getcwd() . '/vendor/bin/rector')) {
+            $this->writeln("<info>Setting up refactoring with rector...</info>\n");
+
+            if (!sprout()->composer()->install('rector/rector --dev')->isSuccessful()) {
+                $this->writeln('<error>Couldn\'t install rector. Check your connection and try again.</error>');
+                return 1;
+            }
+
+            $this->writeln('<info>Rector installed successfully!</info>');
+        }
+
+        Core::generateRefactorFiles();
+
+        $check = $this->option('check');
+
+        $this->writeln($check ? "<comment>Checking for pending refactors...</comment>\n" : "<comment>Running refactors...</comment>\n");
+
+        try {
+            $refactorProcess = sprout()
+                ->process(getcwd() . '/vendor/bin/rector process --config=.rector.dist.php' . ($check ? ' --dry-run' : ''))
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+        } finally {
+            \Leaf\FS\File::delete(getcwd() . '/.rector.dist.php');
+        }
+
+        if ($refactorProcess !== 0) {
+            $this->writeln($check
+                ? '<error>Pending refactors found. Run `composer run refactor` locally to apply them.</error>'
+                : '<error>Refactoring failed. Check your code and try again.</error>');
+            return 1;
+        }
+
+        return 0;
     }
 
     protected function runLinter()
