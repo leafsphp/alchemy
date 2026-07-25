@@ -163,7 +163,7 @@ class Core
             $phpunitXml
         );
 
-        \Leaf\FS\File::create(getcwd() . '/phpunit.xml', $phpunitXml);
+        \Leaf\FS\File::create(getcwd() . '/phpunit.xml', $phpunitXml, ['overwrite' => true]);
     }
 
     protected static function xmlValue($value): string
@@ -173,6 +173,75 @@ class Core
         }
 
         return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES);
+    }
+
+    /**
+     * Wire alchemy's commands into the project's composer scripts
+     */
+    public static function installComposerScripts()
+    {
+        $appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
+
+        $composerConfig = $appComposerJson['config'] ?? [];
+        $composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
+
+        $appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
+        $appComposerJson['scripts']['test'] = './vendor/bin/alchemy test';
+        $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy lint';
+        $appComposerJson['scripts']['fmt'] = './vendor/bin/alchemy fmt';
+        $appComposerJson['scripts']['refactor'] = './vendor/bin/alchemy refactor';
+        $appComposerJson['scripts']['analyse'] = './vendor/bin/alchemy analyse';
+        $appComposerJson['scripts']['ci'] = './vendor/bin/alchemy ci';
+
+        $appComposerJson['config'] = array_merge($composerConfig, [
+            'allow-plugins' => array_merge($composerConfigPlugins, [
+                'pestphp/pest-plugin' => true,
+            ]),
+        ]);
+
+        file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    public static function updateGitIgnore()
+    {
+        $appGitIgnoreFile = getcwd() . '/.gitignore';
+        $gitIgnoreContent = file_exists($appGitIgnoreFile) ? file_get_contents($appGitIgnoreFile) : '';
+
+        if (strpos($gitIgnoreContent, '.alchemy') === false) {
+            file_put_contents($appGitIgnoreFile, "\n# Alchemy\n.alchemy\n", FILE_APPEND);
+        }
+
+        if (strpos($gitIgnoreContent, '.phpunit.result.cache') === false) {
+            file_put_contents($appGitIgnoreFile, ".phpunit.result.cache\n", FILE_APPEND);
+        }
+    }
+
+    public static function generateAnalyseFiles()
+    {
+        $config = static::get();
+        $analyseConfig = $config['analyse'] ?? [];
+
+        $level = $analyseConfig['level'] ?? 5;
+        $paths = (array) ($analyseConfig['paths'] ?? $config['app'] ?? ['src']);
+
+        $neon = "parameters:\n";
+        $neon .= "    level: $level\n";
+        $neon .= "    tmpDir: .alchemy/phpstan\n";
+        $neon .= "    paths:\n";
+
+        foreach ($paths as $path) {
+            $neon .= "        - $path\n";
+        }
+
+        if (!empty($analyseConfig['ignore'])) {
+            $neon .= "    ignoreErrors:\n";
+
+            foreach ((array) $analyseConfig['ignore'] as $pattern) {
+                $neon .= "        - '" . str_replace("'", "''", $pattern) . "'\n";
+            }
+        }
+
+        \Leaf\FS\File::create(getcwd() . '/.phpstan.dist.neon', $neon, ['overwrite' => true]);
     }
 
     public static function generateRefactorFiles()
@@ -258,7 +327,7 @@ class Core
             $rectorDist
         );
 
-        \Leaf\FS\File::create(getcwd() . '/.rector.dist.php', $rectorDist);
+        \Leaf\FS\File::create(getcwd() . '/.rector.dist.php', $rectorDist, ['overwrite' => true]);
     }
 
     public static function generateLintFiles()
@@ -304,6 +373,6 @@ class Core
             $phpcsFixerDist
         );
 
-        \Leaf\FS\File::create(getcwd() . '/.php_cs.dist.php', $phpcsFixerDist);
+        \Leaf\FS\File::create(getcwd() . '/.php_cs.dist.php', $phpcsFixerDist, ['overwrite' => true]);
     }
 }

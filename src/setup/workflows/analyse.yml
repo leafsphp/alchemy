@@ -1,0 +1,27 @@
+name: Static analysis
+
+on: ACTIONS.EVENTS
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 'ACTIONS.PHP.VERSION'
+          extensions: ACTIONS.PHP.EXTENSIONS
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer update --no-interaction --no-progress
+
+      - name: Analyse code
+        run: composer run analyse

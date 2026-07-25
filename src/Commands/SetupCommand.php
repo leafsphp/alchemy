@@ -12,7 +12,7 @@ class SetupCommand extends Command
         {--l|lint? : Run only linter}
         {--t|test? : Run only tests}
         {--r|refactor? : Run only rector refactors}
-        {--gh|actions? : Generate GitHub actions}
+        {--ci|actions? : Generate GitHub actions}
         {--c|check? : Check without changing anything (used in CI)}
         {--f|force? : Replace test or tests folder if it exists}
         {--flags? : Add flags to the command being run separated by commas}';
@@ -23,18 +23,14 @@ class SetupCommand extends Command
      * Execute the command.
      * @return int
      */
+    /**
+     * Forces check/fix behaviour for verb commands (lint = check, fmt = fix)
+     */
+    protected $modeOverride = null;
+
     protected function handle(): int
     {
-        $configFile = getcwd() . '/alchemy.yml';
-
-        if (file_exists($configFile)) {
-            Core::set(Yaml::parseFile($configFile));
-        } else {
-            $this->writeln('<comment>No alchemy.yml found, using default configuration. Run `alchemy config:install` to customize.</comment>');
-            Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
-        }
-
-        \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
+        $this->loadAlchemyConfig();
 
         if ($this->option('test')) {
             set_time_limit(0);
@@ -57,9 +53,14 @@ class SetupCommand extends Command
             $this->runTests();
             $this->runLinter();
 
-            // rector rewrites code, so it only joins the pipeline when configured
+            // rector rewrites code and phpstan needs a chosen level,
+            // so they only join the pipeline when configured
             if (Core::get('refactor')) {
                 $this->runRefactor();
+            }
+
+            if (Core::get('analyse')) {
+                $this->runAnalyser();
             }
 
             $this->generateActions();
@@ -68,6 +69,29 @@ class SetupCommand extends Command
         $this->writeln('<info>Alchemy setup successfully.</info>');
 
         return 0;
+    }
+
+    protected function loadAlchemyConfig()
+    {
+        $configFile = getcwd() . '/alchemy.yml';
+
+        if (file_exists($configFile)) {
+            Core::set(Yaml::parseFile($configFile));
+        } else {
+            $this->writeln('<comment>No alchemy.yml found, using default configuration. Run `alchemy init` to customize.</comment>');
+            Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
+        }
+
+        \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
+    }
+
+    protected function checkMode(): bool
+    {
+        if ($this->modeOverride !== null) {
+            return $this->modeOverride === 'check';
+        }
+
+        return (bool) $this->option('check');
     }
 
     protected function runTests()
@@ -210,7 +234,7 @@ class SetupCommand extends Command
 
         Core::generateRefactorFiles();
 
-        $check = $this->option('check');
+        $check = $this->checkMode();
 
         $this->writeln($check ? "<comment>Checking for pending refactors...</comment>\n" : "<comment>Running refactors...</comment>\n");
 
@@ -234,6 +258,46 @@ class SetupCommand extends Command
         return 0;
     }
 
+    protected function runAnalyser()
+    {
+        if (!Core::get('analyse')) {
+            $this->writeln('<comment>No `analyse` section found in alchemy.yml. Add one to use PHPStan.</comment>');
+            return 0;
+        }
+
+        if (!file_exists(getcwd() . '/vendor/bin/phpstan')) {
+            $this->writeln("<info>Setting up static analysis with phpstan...</info>\n");
+
+            if (!sprout()->composer()->install('phpstan/phpstan --dev')->isSuccessful()) {
+                $this->writeln('<error>Couldn\'t install phpstan. Check your connection and try again.</error>');
+                return 1;
+            }
+
+            $this->writeln('<info>PHPStan installed successfully!</info>');
+        }
+
+        Core::generateAnalyseFiles();
+
+        $this->writeln("<comment>Analysing code...</comment>\n");
+
+        try {
+            $analyseProcess = sprout()
+                ->process(getcwd() . '/vendor/bin/phpstan analyse --configuration=.phpstan.dist.neon --no-progress --ansi')
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+        } finally {
+            \Leaf\FS\File::delete(getcwd() . '/.phpstan.dist.neon');
+        }
+
+        if ($analyseProcess !== 0) {
+            $this->writeln('<error>Static analysis found issues. Fix them and run `composer run analyse` again.</error>');
+            return 1;
+        }
+
+        return 0;
+    }
+
     protected function runLinter()
     {
         if (!file_exists(getcwd() . '/vendor/bin/php-cs-fixer')) {
@@ -249,7 +313,7 @@ class SetupCommand extends Command
 
         Core::generateLintFiles();
 
-        $check = $this->option('check');
+        $check = $this->checkMode();
         $risky = (Core::get('lint')['risky'] ?? true) ? ' --allow-risky=yes' : '';
         $lintFlags = $risky . ($check ? ' --dry-run --diff' : '');
 
@@ -281,7 +345,28 @@ class SetupCommand extends Command
 
     protected function generateActions()
     {
-        $config = Core::get('actions');
+        $config = Core::get('actions') ?? [];
+        $providers = (array) ($config['provider'] ?? 'github');
+        $status = 0;
+
+        foreach ($providers as $provider) {
+            if ($provider === 'github') {
+                $status = $this->generateGithubActions($config) ?: $status;
+            } elseif ($provider === 'gitlab') {
+                $status = $this->generateGitlabCi($config) ?: $status;
+            } elseif ($provider === 'circleci') {
+                $status = $this->generateCircleCi($config) ?: $status;
+            } else {
+                $this->writeln("<error>Unknown CI provider \"$provider\". Supported: github, gitlab, circleci.</error>");
+                $status = 1;
+            }
+        }
+
+        return $status;
+    }
+
+    protected function generateGithubActions($config)
+    {
         $actionToRun = $config['run'] ?? [];
 
         \Leaf\FS\Directory::create(getcwd() . '/.github');
@@ -337,7 +422,7 @@ class SetupCommand extends Command
 
                 $actionStub = \Leaf\FS\File::read(dirname(__DIR__) . "/setup/workflows/$action.yml");
 
-                $lintRun = $lintAutofix ? 'composer run lint' : 'composer run lint -- --check';
+                $lintRun = $lintAutofix ? 'composer run fmt' : 'composer run lint -- --check';
                 $lintSteps = $lintAutofix ? "\n
       - name: Commit style fixes
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -355,6 +440,105 @@ class SetupCommand extends Command
                 ]);
             }
         }
+
+        return 0;
+    }
+
+    protected function generateGitlabCi($config)
+    {
+        $ciFile = getcwd() . '/.gitlab-ci.yml';
+
+        if (file_exists($ciFile)) {
+            $this->writeln('<comment>.gitlab-ci.yml already exists, skipping.</comment>');
+            return 0;
+        }
+
+        $jobs = $config['run'] ?? [];
+        $phpVersions = $config['php']['versions'] ?? ['8.3'];
+        $latestPhp = end($phpVersions);
+        $events = $config['events'] ?? $config['event'] ?? ['push'];
+
+        $this->writeln('<info>Writing .gitlab-ci.yml...</info>');
+
+        $yml = "# Generated by Alchemy\n\n";
+
+        if (in_array('pull_request', $events) && !in_array('push', $events)) {
+            $yml .= "workflow:\n  rules:\n    - if: \$CI_PIPELINE_SOURCE == 'merge_request_event'\n\n";
+        }
+
+        $yml .= "stages:\n  - qa\n  - test\n\n";
+        $yml .= ".php-job:\n";
+        $yml .= "  before_script:\n";
+        $yml .= "    - apt-get update -yqq && apt-get install -yqq git unzip libzip-dev\n";
+        $yml .= "    - docker-php-ext-install zip > /dev/null\n";
+        $yml .= "    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer\n";
+        $yml .= "    - composer update --no-interaction --no-progress\n";
+        $yml .= "  cache:\n    key: composer-\$CI_JOB_NAME\n    paths:\n      - vendor/\n\n";
+
+        foreach ($jobs as $job) {
+            if ($job === 'tests' || $job === 'test') {
+                $versionsList = "'" . implode("', '", $phpVersions) . "'";
+                $yml .= "test:\n  extends: .php-job\n  stage: test\n  image: php:\${PHP_VERSION}-cli\n";
+                $yml .= "  parallel:\n    matrix:\n      - PHP_VERSION: [$versionsList]\n";
+                $yml .= "  script:\n    - composer run test\n\n";
+            } elseif ($job === 'lint') {
+                $yml .= "lint:\n  extends: .php-job\n  stage: qa\n  image: php:$latestPhp-cli\n  script:\n    - composer run lint -- --check\n\n";
+            } elseif ($job === 'refactor') {
+                $yml .= "refactor:\n  extends: .php-job\n  stage: qa\n  image: php:$latestPhp-cli\n  script:\n    - composer run refactor -- --check\n\n";
+            } elseif ($job === 'analyse') {
+                $yml .= "analyse:\n  extends: .php-job\n  stage: qa\n  image: php:$latestPhp-cli\n  script:\n    - composer run analyse\n\n";
+            }
+        }
+
+        \Leaf\FS\File::create($ciFile, rtrim($yml) . "\n");
+
+        return 0;
+    }
+
+    protected function generateCircleCi($config)
+    {
+        $ciFile = getcwd() . '/.circleci/config.yml';
+
+        if (file_exists($ciFile)) {
+            $this->writeln('<comment>.circleci/config.yml already exists, skipping.</comment>');
+            return 0;
+        }
+
+        $jobs = $config['run'] ?? [];
+        $phpVersions = $config['php']['versions'] ?? ['8.3'];
+        $latestPhp = end($phpVersions);
+
+        $this->writeln('<info>Writing .circleci/config.yml...</info>');
+
+        $yml = "# Generated by Alchemy\nversion: 2.1\n\njobs:\n";
+        $workflowJobs = '';
+
+        foreach ($jobs as $job) {
+            if ($job === 'tests' || $job === 'test') {
+                $versionsList = "'" . implode("', '", $phpVersions) . "'";
+                $yml .= "  test:\n    parameters:\n      php:\n        type: string\n";
+                $yml .= "    docker:\n      - image: cimg/php:<< parameters.php >>\n";
+                $yml .= "    steps:\n      - checkout\n      - run: composer update --no-interaction --no-progress\n      - run: composer run test\n";
+                $workflowJobs .= "      - test:\n          matrix:\n            parameters:\n              php: [$versionsList]\n";
+            } elseif ($job === 'lint') {
+                $yml .= "  lint:\n    docker:\n      - image: cimg/php:$latestPhp\n";
+                $yml .= "    steps:\n      - checkout\n      - run: composer update --no-interaction --no-progress\n      - run: composer run lint -- --check\n";
+                $workflowJobs .= "      - lint\n";
+            } elseif ($job === 'refactor') {
+                $yml .= "  refactor:\n    docker:\n      - image: cimg/php:$latestPhp\n";
+                $yml .= "    steps:\n      - checkout\n      - run: composer update --no-interaction --no-progress\n      - run: composer run refactor -- --check\n";
+                $workflowJobs .= "      - refactor\n";
+            } elseif ($job === 'analyse') {
+                $yml .= "  analyse:\n    docker:\n      - image: cimg/php:$latestPhp\n";
+                $yml .= "    steps:\n      - checkout\n      - run: composer update --no-interaction --no-progress\n      - run: composer run analyse\n";
+                $workflowJobs .= "      - analyse\n";
+            }
+        }
+
+        $yml .= "\nworkflows:\n  qa:\n    jobs:\n$workflowJobs";
+
+        \Leaf\FS\Directory::create(getcwd() . '/.circleci');
+        \Leaf\FS\File::create($ciFile, rtrim($yml) . "\n");
 
         return 0;
     }

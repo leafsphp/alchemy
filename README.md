@@ -126,6 +126,47 @@ refactor:
 
 Rector only joins the full `alchemy setup` pipeline when a `refactor` section exists — a tool that rewrites your code should be opted into.
 
+Alchemy can generate CI for more than GitHub Actions. Set one or more providers under `actions.provider` and the same yml projects onto each — `.github/workflows/*.yml`, `.gitlab-ci.yml` (with a PHP version matrix and composer caching), or `.circleci/config.yml`:
+
+```yaml
+actions:
+  provider: # github is the default
+    - github
+    - gitlab
+    - circleci
+  run:
+    - lint
+    - tests
+    - refactor
+```
+
+Lint and refactor jobs run in check mode on CI (they fail on violations instead of fixing); the auto-commit `lint.autofix` flow is GitHub-only.
+
+Static analysis works the same way — add an `analyse` section and PHPStan is installed and configured on your first `composer run analyse`:
+
+```yaml
+analyse:
+  level: 6
+  ignore:
+    - '#some error pattern to ignore#'
+```
+
+## ⚗️ Commands
+
+| Command | What it does |
+| --- | --- |
+| `alchemy init` | Create alchemy.yml — detects your framework and **imports an existing phpunit.xml / php-cs-fixer config** |
+| `alchemy test` | Run your tests (installs your engine on first run) |
+| `alchemy lint` | Check code style — reports violations, changes nothing |
+| `alchemy fmt` | Fix code style |
+| `alchemy refactor` | Apply Rector refactors (`--check` in CI) |
+| `alchemy analyse` | Run PHPStan static analysis |
+| `alchemy ci` | Generate CI pipelines for your configured providers |
+| `alchemy switch <target>` | Switch CI provider (github/gitlab/circleci) or test engine (pest/phpunit) — everything regenerates from the same yml |
+| `alchemy eject` | Leave alchemy: export real config files, no lock-in |
+
+Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine.
+
 Alchemy also respects existing setups: a hand-written `phpunit.xml` in your project is left untouched (alchemy parks it during a run and restores it), and `alchemy eject` exports real config files if you ever want to leave.
 
 Once you're done setting up your `alchemy.yml` file, you can run the setup script.

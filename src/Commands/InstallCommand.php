@@ -36,37 +36,11 @@ class InstallCommand extends Command
 
     protected function updateComposerJson()
     {
-        $appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
-
-        $composerConfig = $appComposerJson['config'] ?? [];
-        $composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
-
-        $appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
-        $appComposerJson['scripts']['test'] = './vendor/bin/alchemy setup --test';
-        $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy setup --lint';
-        $appComposerJson['scripts']['refactor'] = './vendor/bin/alchemy setup --refactor';
-        $appComposerJson['scripts']['actions'] = './vendor/bin/alchemy setup --actions';
-
-        $appComposerJson['config'] = array_merge($composerConfig, [
-            'allow-plugins' => array_merge($composerConfigPlugins, [
-                'pestphp/pest-plugin' => true,
-            ]),
-        ]);
-
-        file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        \Leaf\Alchemy\Core::installComposerScripts();
     }
 
     protected function updateGitIgnore()
     {
-        $appGitIgnoreFile = getcwd() . '/.gitignore';
-        $gitIgnoreContent = file_exists($appGitIgnoreFile) ? file_get_contents($appGitIgnoreFile) : '';
-
-        if (strpos($gitIgnoreContent, '.alchemy') === false) {
-            file_put_contents($appGitIgnoreFile, "\n# Alchemy\n.alchemy\n", FILE_APPEND);
-        }
-
-        if (strpos($gitIgnoreContent, '.phpunit.result.cache') === false) {
-            file_put_contents($appGitIgnoreFile, ".phpunit.result.cache\n", FILE_APPEND);
-        }
+        \Leaf\Alchemy\Core::updateGitIgnore();
     }
 }

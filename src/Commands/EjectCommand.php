@@ -36,6 +36,8 @@ class EjectCommand extends Command
             return 1;
         }
 
+        \Leaf\FS\File::delete(getcwd() . '/.php-cs-fixer.dist.php');
+
         Core::generateTestFiles();
         Core::generateLintFiles();
 

@@ -22,6 +22,14 @@ $app = sprout()->createApp([
     'version' => '',
 ]);
 
+$app->register(new Leaf\Alchemy\Commands\InitCommand);
+$app->register(new Leaf\Alchemy\Commands\TestCommand);
+$app->register(new Leaf\Alchemy\Commands\LintCommand);
+$app->register(new Leaf\Alchemy\Commands\FmtCommand);
+$app->register(new Leaf\Alchemy\Commands\RefactorCommand);
+$app->register(new Leaf\Alchemy\Commands\AnalyseCommand);
+$app->register(new Leaf\Alchemy\Commands\CiCommand);
+$app->register(new Leaf\Alchemy\Commands\SwitchCommand);
 $app->register(new Leaf\Alchemy\Commands\InstallCommand);
 $app->register(new Leaf\Alchemy\Commands\SetupCommand);
 $app->register(new Leaf\Alchemy\Commands\EjectCommand);
