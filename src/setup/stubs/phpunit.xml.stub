@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="CONFIG.XMLNSXSI"
-         xsi:noNamespaceSchemaLocation="CONFIG.NONSLOCATION"
-         bootstrap="CONFIG.BOOTSTRAP"
-         colors="CONFIG.COLORS"
-         cacheDirectory=".alchemy"
->
+<phpunit CONFIG.ATTRIBUTES>
     <testsuites>
         CONFIG.TESTSUITES
     </testsuites>
@@ -12,5 +7,8 @@
         <include>
             COVERAGE.INCLUDES
         </include>
+        COVERAGE.EXCLUDES
     </source>
+    CONFIG.PHPBLOCK
+    CONFIG.EXTENSIONS
 </phpunit>

@@ -4,7 +4,7 @@ $finder = PhpCsFixer\Finder::create()
   ->in(LINT.PATHS)
   ->name('*.php')
   ->ignoreDotFiles(LINT.IGNORE_DOT_FILES)
-  ->ignoreVCS(LINT.IGNORE_VC_FILES);
+  ->ignoreVCS(LINT.IGNORE_VC_FILES)LINT.EXCLUDES;
 
 return (new PhpCsFixer\Config())
   ->setRules(
