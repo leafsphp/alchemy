@@ -2,59 +2,64 @@
 
 namespace Leaf\Alchemy\Commands;
 
+use Leaf\Alchemy\Core;
 use Leaf\Sprout\Command;
+use Symfony\Component\Yaml\Yaml;
 
 class EjectCommand extends Command
 {
-    protected $signature = 'config:eject';
-    protected $description = 'Switch from alchemy to pest or phpunit';
-    protected $help = 'This command will help you switch from alchemy to pest or phpunit by exporting your configuration to a phpunit.xml file and deleting the alchemy.config.php file.';
+    protected $signature = 'eject
+        {--f|force? : Overwrite existing config files}';
+    protected $description = 'Leave alchemy: export real config files for your test engine and linter';
+    protected $help = 'This command exports your alchemy.yml configuration to a standard phpunit.xml and .php-cs-fixer.dist.php so you can run your engines directly without alchemy. No lock-in.';
 
     /**
      * Execute the command.
      * @return int
      */
-    protected function handle()
+    protected function handle(): int
     {
-        $configFile = getcwd() . '/alchemy.config.php';
-        $config = [];
+        $configFile = getcwd() . '/alchemy.yml';
 
         if (file_exists($configFile)) {
-            $this->writeln('<comment>Using existing alchemy.config.php...</comment>');
-            $config = require $configFile;
+            Core::set(Yaml::parseFile($configFile));
         } else {
-            $config = require dirname(__DIR__) . '/setup/pest/alchemy.config.php';
+            $this->writeln('<comment>No alchemy.yml found, exporting default configuration.</comment>');
+            Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
         }
 
-        $testSuiteConfig = $config['testsuites'];
-        $testSuites = '';
-
-        foreach ($testSuiteConfig as $testSuiteKey => $testSuiteDir) {
-            $testSuites .= "<testsuite name=\"Test Suite $testSuiteDir\"><directory suffix=\".test.php\">$testSuiteDir</directory></testsuite>";
+        if (
+            !$this->option('force')
+            && (file_exists(getcwd() . '/phpunit.xml') || file_exists(getcwd() . '/.php-cs-fixer.dist.php'))
+        ) {
+            $this->writeln('<error>phpunit.xml or .php-cs-fixer.dist.php already exists. Re-run with --force to overwrite.</error>');
+            return 1;
         }
 
-        $testCoverageConfig = $config['coverage']['include'];
-        $coverageIncludes = '';
+        Core::generateTestFiles();
+        Core::generateLintFiles();
 
-        foreach ($testCoverageConfig as $coverageDir => $coverageKey) {
-            $coverageIncludes .= "<directory suffix=\"$coverageKey\">$coverageDir</directory>";
-        }
+        // php-cs-fixer picks .php-cs-fixer.dist.php up without any flags
+        \Leaf\FS\File::move(getcwd() . '/.php_cs.dist.php', getcwd() . '/.php-cs-fixer.dist.php');
 
-        \Leaf\FS\File::write(getcwd() . '/phpunit.xml', function () use ($config, $testSuites, $coverageIncludes) {
-            $phpunitXml = \Leaf\FS\File::read(dirname(__DIR__) . '/setup/stubs/phpunit.xml.stub');
-            $phpunitXml = str_replace(
-                ['CONFIG.XMLNSXSI', 'CONFIG.NONSLOCATION', 'CONFIG.BOOTSTRAP', 'CONFIG.COLORS', 'CONFIG.TESTSUITES', 'COVERAGE.PROCESSUNCOVEREDFILES', 'COVERAGE.INCLUDES'],
-                [$config['xmlns:xsi'], $config['xsi:noNamespaceSchemaLocation'], $config['bootstrap'], $config['colors'] ? 'true' : 'false', $testSuites, $config['coverage']['processUncoveredFiles'] ? 'true' : 'false', $coverageIncludes],
-                $phpunitXml
-            );
+        $this->updateComposerScripts();
 
-            return $phpunitXml;
-        });
-
-        \Leaf\FS\File::delete(getcwd() . '/alchemy.config.php');
-
-        $output->writeln('<info>Config exported successfully.</info>');
+        $this->writeln('<info>Config exported: phpunit.xml + .php-cs-fixer.dist.php</info>');
+        $this->writeln('<comment>Your composer test/lint scripts now call your engines directly.</comment>');
+        $this->writeln('<comment>You can now remove alchemy with `composer remove leafs/alchemy` and delete alchemy.yml.</comment>');
 
         return 0;
+    }
+
+    protected function updateComposerScripts()
+    {
+        $engine = Core::get('tests')['engine'] ?? 'pest';
+        $appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
+
+        $appComposerJson['scripts']['test'] = "./vendor/bin/$engine";
+        $appComposerJson['scripts']['lint'] = './vendor/bin/php-cs-fixer fix';
+        unset($appComposerJson['scripts']['alchemy'], $appComposerJson['scripts']['actions']);
+
+        file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 }

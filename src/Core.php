@@ -53,9 +53,10 @@ class Core
 
         $testSuites = '';
         $coverageIncludes = '';
+        $testFileSuffix = ltrim($config['tests']['files'][0] ?? '*.test.php', '*');
 
         foreach ($testSuiteConfig as $testSuiteDir) {
-            $testSuites .= "<testsuite name=\"Test Suite $testSuiteDir\"><directory suffix=\".test.php\">$testSuiteDir</directory></testsuite>";
+            $testSuites .= "<testsuite name=\"Test Suite $testSuiteDir\"><directory suffix=\"$testFileSuffix\">$testSuiteDir</directory></testsuite>";
         }
 
         foreach ($appPathsConfig as $appDir) {

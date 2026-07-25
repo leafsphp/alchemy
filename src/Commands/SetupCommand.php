@@ -12,6 +12,7 @@ class SetupCommand extends Command
         {--l|lint? : Run only linter}
         {--t|test? : Run only tests}
         {--gh|actions? : Generate GitHub actions}
+        {--c|check? : Check code style without fixing anything (used in CI)}
         {--f|force? : Replace test or tests folder if it exists}
         {--flags? : Add flags to the command being run separated by commas}';
     protected $description = 'Setup work environment based on Alchemy configuration';
@@ -23,7 +24,14 @@ class SetupCommand extends Command
      */
     protected function handle(): int
     {
-        Core::set(Yaml::parseFile(getcwd() . '/alchemy.yml'));
+        $configFile = getcwd() . '/alchemy.yml';
+
+        if (file_exists($configFile)) {
+            Core::set(Yaml::parseFile($configFile));
+        } else {
+            $this->writeln('<comment>No alchemy.yml found, using default configuration. Run `alchemy config:install` to customize.</comment>');
+            Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
+        }
 
         \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
 
@@ -91,6 +99,7 @@ class SetupCommand extends Command
 
         $this->writeln("<comment>  > Using $engine for tests ...</comment>");
 
+        $binary = $engine;
         $flags = $engine === 'pest' ? '--colors=always' : '';
         $flags .= $this->option('flags')
             ? (' --' . implode(' --', explode(',', $this->option('flags'))))
@@ -98,22 +107,39 @@ class SetupCommand extends Command
 
         if ($parallel) {
             $this->writeln("<info>  > Running tests in parallel...</info>");
-            $flags .= $engine === 'pest' ? ' --parallel' : ' --parallel';
+
+            if ($engine === 'pest') {
+                $flags .= ' --parallel';
+            } else {
+                // phpunit has no --parallel; paratest wraps it
+                if (!file_exists(getcwd() . '/vendor/bin/paratest')) {
+                    $this->writeln("<info>Setting up parallel testing with paratest...</info>\n");
+
+                    if (!sprout()->composer()->install('brianium/paratest --dev')->isSuccessful()) {
+                        $this->writeln('<error>Couldn\'t install paratest. Check your connection and try again.</error>');
+                        return 1;
+                    }
+                }
+
+                $binary = 'paratest';
+            }
         }
 
-        $testProcess = sprout()
-            ->process(getcwd() . "/vendor/bin/$engine $flags")
-            ->run(function ($type, $line): void {
-                $this->write($line);
-            });
+        try {
+            $testProcess = sprout()
+                ->process(getcwd() . "/vendor/bin/$binary $flags")
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+        } finally {
+            \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
 
-        \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
-
-        if (file_exists(getcwd() . '/.phpunit.result.cache')) {
-            \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
+            if (file_exists(getcwd() . '/.phpunit.result.cache')) {
+                \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
+            }
         }
 
-        if ($testProcess === 1) {
+        if ($testProcess !== 0) {
             $this->writeln('<error>Tests failed. Check your code and try again.</error>');
             return 1;
         }
@@ -136,22 +162,29 @@ class SetupCommand extends Command
 
         Core::generateLintFiles();
 
-        $this->writeln("<comment>Running linter...</comment>\n");
+        $check = $this->option('check');
+        $lintFlags = $check ? ' --dry-run --diff' : '';
 
-        $lintProcess = sprout()
-            ->process(getcwd() . '/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes')
-            ->run(function ($type, $line): void {
-                $this->write($line);
-            });
+        $this->writeln($check ? "<comment>Checking code style...</comment>\n" : "<comment>Running linter...</comment>\n");
 
-        \Leaf\FS\File::delete(getcwd() . '/.php_cs.dist.php');
+        try {
+            $lintProcess = sprout()
+                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php --allow-risky=yes$lintFlags")
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+        } finally {
+            \Leaf\FS\File::delete(getcwd() . '/.php_cs.dist.php');
 
-        if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
-            \Leaf\FS\File::move(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
+            if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
+                \Leaf\FS\File::move(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
+            }
         }
 
-        if ($lintProcess === 1) {
-            $this->writeln('<error>Linting failed. Check your code and try again.</error>');
+        if ($lintProcess !== 0) {
+            $this->writeln($check
+                ? '<error>Style violations found. Run `composer run lint` locally to fix them.</error>'
+                : '<error>Linting failed. Check your code and try again.</error>');
             return 1;
         }
 
@@ -172,8 +205,9 @@ class SetupCommand extends Command
             $phpExtensions = $config['php']['extensions'] ?? 'json, zip';
 
             $os = $config['os'] ?? ['ubuntu-latest'];
-            $events = $config['events'] ?? ['push'];
+            $events = $config['events'] ?? $config['event'] ?? ['push'];
             $failFast = $config['fail-fast'] ?? true;
+            $lintAutofix = Core::get('lint')['autofix'] ?? false;
 
             $actionsToWrite = [];
             $database = Core::get('tests')['database'] ?? false;
@@ -198,7 +232,7 @@ class SetupCommand extends Command
           -u$dbUser -p$dbPassword -P$dbPort";
                 } else if ($database['type'] === 'pgsql') {
                     $actionsToWrite[] = "\n
-      - name: Iniitialize Database
+      - name: Initialize Database
         uses: ikalnytskyi/action-setup-postgres@v6
         with:
           username: $dbUser
@@ -215,9 +249,16 @@ class SetupCommand extends Command
 
                 $actionStub = \Leaf\FS\File::read(dirname(__DIR__) . "/setup/workflows/$action.yml");
 
+                $lintRun = $lintAutofix ? 'composer run lint' : 'composer run lint -- --check';
+                $lintSteps = $lintAutofix ? "\n
+      - name: Commit style fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: fix styling'" : '';
+
                 $actionStub = str_replace(
-                    ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS', 'ACTIONS.STEPS.COVERAGE'],
-                    [Core::unJsonify($phpVersions, 0), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false', $actionsCoverage, implode("\n", $actionsToWrite), $coverageFlags],
+                    ['ACTIONS.PHP.VERSIONS', 'ACTIONS.PHP.VERSION', 'ACTIONS.PHP.EXTENSIONS', 'ACTIONS.OS', 'ACTIONS.EVENTS', 'ACTIONS.FAILFAST', 'ACTIONS.PHP.COVERAGE', 'ACTIONS.PHP.ACTIONS', 'ACTIONS.STEPS.COVERAGE', 'ACTIONS.LINT.RUN', 'ACTIONS.LINT.STEPS'],
+                    [Core::unJsonify($phpVersions, 0), end($phpVersions), $phpExtensions, Core::unJsonify($os, 0), Core::unJsonify($events, 0), $failFast ? 'true' : 'false', $actionsCoverage, implode("\n", $actionsToWrite), $coverageFlags, $lintRun, $lintSteps],
                     $actionStub
                 );
 

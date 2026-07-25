@@ -24,7 +24,6 @@ $app = sprout()->createApp([
 
 $app->register(new Leaf\Alchemy\Commands\InstallCommand);
 $app->register(new Leaf\Alchemy\Commands\SetupCommand);
-// $app->register(new Leaf\Alchemy\Commands\EjectCommand);
-// $app->register(new Leaf\Alchemy\Commands\RunCommand);
+$app->register(new Leaf\Alchemy\Commands\EjectCommand);
 
-$app->run();
+exit((int) ($app->run() ?? 0));
