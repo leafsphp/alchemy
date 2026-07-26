@@ -65,3 +65,11 @@ function writeComposerJson(array $extra = []): void
         json_encode(array_merge(['name' => 'alchemy/sandbox'], $extra), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
     );
 }
+
+/**
+ * Symlink the alchemy repo's vendor (pest + php-cs-fixer installed) into the sandbox
+ */
+function linkVendor(): void
+{
+    symlink(dirname(__DIR__) . '/vendor', getcwd() . '/vendor');
+}

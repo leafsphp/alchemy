@@ -67,18 +67,47 @@ class SetupCommand extends Command
         return 0;
     }
 
+    /**
+     * The project's own alchemy.yml (empty when running on bundled defaults) —
+     * used to tell "user configured this tool" from "alchemy defaults apply"
+     */
+    protected $projectConfig = [];
+
     protected function loadAlchemyConfig()
     {
         $configFile = getcwd() . '/alchemy.yml';
 
         if (file_exists($configFile)) {
-            Core::set(Yaml::parseFile($configFile));
+            $this->projectConfig = Yaml::parseFile($configFile) ?? [];
+            Core::set($this->projectConfig);
         } else {
             $this->writeln('<comment>No alchemy.yml found, using default configuration. Run `alchemy init` to customize.</comment>');
             Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
         }
 
         \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
+    }
+
+    /**
+     * Alchemy never migrates a tool you didn't hand it: when your alchemy.yml
+     * doesn't configure a tool but the project has its own config file for it,
+     * that file is used as-is.
+     */
+    protected function userEngineConfig(string $tool): ?string
+    {
+        if ($tool === 'lint' && empty($this->projectConfig['lint'])) {
+            foreach (['.php-cs-fixer.php', '.php-cs-fixer.dist.php'] as $file) {
+                if (file_exists(getcwd() . "/$file")) {
+                    return $file;
+                }
+            }
+        }
+
+        if ($tool === 'tests' && empty($this->projectConfig['tests']) && file_exists(getcwd() . '/phpunit.xml')) {
+            return 'phpunit.xml';
+        }
+
+        return null;
     }
 
     protected function checkMode(): bool
@@ -93,9 +122,16 @@ class SetupCommand extends Command
     protected function runTests()
     {
         $config = Core::get('tests');
+        $userConfig = $this->userEngineConfig('tests');
 
         $engine = $config['engine'] ?? 'pest';
         $parallel = $config['parallel'] ?? false;
+
+        // a project with its own phpunit.xml and no tests section runs on its own config
+        if ($userConfig) {
+            $engine = file_exists(getcwd() . '/vendor/bin/phpunit') && !file_exists(getcwd() . '/vendor/bin/pest') ? 'phpunit' : 'pest';
+        }
+
         $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --dev --with-all-dependencies' : '\'phpunit/phpunit:*\' --dev';
 
         if (!file_exists(getcwd() . "/vendor/bin/$engine")) {
@@ -111,6 +147,28 @@ class SetupCommand extends Command
             }
 
             $this->writeln("<info>$engine installed successfully!</info>");
+        }
+
+        if ($userConfig) {
+            $this->writeln('<comment>  > Using your existing phpunit.xml (alchemy.yml has no tests section)...</comment>');
+
+            $userFlags = $engine === 'pest' ? '--colors=always' : '';
+            $userFlags .= $this->option('flags')
+                ? (' --' . implode(' --', explode(',', $this->option('flags'))))
+                : '';
+
+            $testProcess = sprout()
+                ->process(getcwd() . "/vendor/bin/$engine $userFlags")
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+
+            if ($testProcess !== 0) {
+                $this->writeln('<error>Tests failed. Check your code and try again.</error>');
+                return 1;
+            }
+
+            return 0;
         }
 
         if (!\Leaf\FS\Directory::exists(getcwd() . '/' . ($config['paths'][0] ?? '/tests'))) {
@@ -307,9 +365,30 @@ class SetupCommand extends Command
             $this->writeln('<info>Linter installed successfully!</info>');
         }
 
+        $check = $this->checkMode();
+
+        // a project with its own fixer config and no lint section keeps its setup untouched
+        if ($userConfig = $this->userEngineConfig('lint')) {
+            $this->writeln("<comment>Using your existing $userConfig (alchemy.yml has no lint section)...</comment>\n");
+
+            $lintProcess = sprout()
+                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : ''))
+                ->run(function ($type, $line): void {
+                    $this->write($line);
+                });
+
+            if ($lintProcess !== 0) {
+                $this->writeln($check
+                    ? '<error>Style violations found. Run `composer run fmt` locally to fix them.</error>'
+                    : '<error>Linting failed. Check your code and try again.</error>');
+                return 1;
+            }
+
+            return 0;
+        }
+
         Core::generateLintFiles();
 
-        $check = $this->checkMode();
         $risky = (Core::get('lint')['risky'] ?? true) ? ' --allow-risky=yes' : '';
         $lintFlags = $risky . ($check ? ' --dry-run --diff' : '');
 

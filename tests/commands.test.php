@@ -181,3 +181,59 @@ test('eject exports real config files and rewires composer scripts', function ()
     expect($secondExit)->toBe(1)
         ->and($secondOutput)->toContain('--force');
 });
+
+test('lint respects an existing php-cs-fixer config when alchemy.yml has no lint section', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n");
+    file_put_contents(getcwd() . '/.php-cs-fixer.dist.php', <<<'PHP'
+<?php
+
+$finder = PhpCsFixer\Finder::create()->in(__DIR__ . '/src');
+
+return (new PhpCsFixer\Config())
+    ->setRules(['single_quote' => true])
+    ->setFinder($finder);
+PHP);
+    $userConfigBefore = file_get_contents(getcwd() . '/.php-cs-fixer.dist.php');
+    file_put_contents(getcwd() . '/src/Bad.php', "<?php\n\n\$x = \"double\";\n");
+
+    [$exit, $output] = alchemy('lint');
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('Using your existing .php-cs-fixer.dist.php')
+        ->and(file_exists(getcwd() . '/.php_cs.dist.php'))->toBeFalse()
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain('"double"');
+
+    [$fmtExit] = alchemy('fmt');
+
+    expect($fmtExit)->toBe(0)
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain("'double'")
+        ->and(file_get_contents(getcwd() . '/.php-cs-fixer.dist.php'))->toBe($userConfigBefore);
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('tests respect an existing phpunit.xml when alchemy.yml has no tests section', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/tests');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n");
+    file_put_contents(getcwd() . '/phpunit.xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" colors="true">
+    <testsuites>
+        <testsuite name="Mine"><directory suffix="MyTest.php">tests</directory></testsuite>
+    </testsuites>
+</phpunit>
+XML);
+    $userConfigBefore = file_get_contents(getcwd() . '/phpunit.xml');
+    file_put_contents(getcwd() . '/tests/ExampleMyTest.php', "<?php\n\ntest('runs on the user suite', function () {\n    expect(true)->toBeTrue();\n});\n");
+
+    [$exit, $output] = alchemy('test');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Using your existing phpunit.xml')
+        ->and($output)->toContain('runs on the user suite')
+        ->and(file_get_contents(getcwd() . '/phpunit.xml'))->toBe($userConfigBefore)
+        ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml.user'))->toBeFalse();
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');

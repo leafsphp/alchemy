@@ -167,7 +167,7 @@ analyse:
 
 Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine.
 
-Alchemy also respects existing setups: a hand-written `phpunit.xml` in your project is left untouched (alchemy parks it during a run and restores it), and `alchemy eject` exports real config files if you ever want to leave.
+Alchemy also respects existing setups — commands only touch files in their own scope. If your `alchemy.yml` doesn't configure a tool but your project has its own config for it (a hand-written `.php-cs-fixer.dist.php` or `phpunit.xml`), alchemy runs the tool with **your** config untouched — you're never migrated unless you ask (`alchemy init`). And `alchemy eject` exports real config files if you ever want to leave.
 
 Once you're done setting up your `alchemy.yml` file, you can run the setup script.
 
