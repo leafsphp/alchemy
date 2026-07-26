@@ -185,13 +185,14 @@ class Core
         $composerConfig = $appComposerJson['config'] ?? [];
         $composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
 
-        $appComposerJson['scripts']['alchemy'] = './vendor/bin/alchemy setup';
-        $appComposerJson['scripts']['test'] = './vendor/bin/alchemy test';
-        $appComposerJson['scripts']['lint'] = './vendor/bin/alchemy lint';
-        $appComposerJson['scripts']['fmt'] = './vendor/bin/alchemy fmt';
-        $appComposerJson['scripts']['refactor'] = './vendor/bin/alchemy refactor';
-        $appComposerJson['scripts']['analyse'] = './vendor/bin/alchemy analyse';
-        $appComposerJson['scripts']['ci'] = './vendor/bin/alchemy ci';
+        // @php keeps the scripts working on Windows too
+        $appComposerJson['scripts']['alchemy'] = '@php vendor/bin/alchemy setup';
+        $appComposerJson['scripts']['test'] = '@php vendor/bin/alchemy test';
+        $appComposerJson['scripts']['lint'] = '@php vendor/bin/alchemy lint';
+        $appComposerJson['scripts']['fmt'] = '@php vendor/bin/alchemy fmt';
+        $appComposerJson['scripts']['refactor'] = '@php vendor/bin/alchemy refactor';
+        $appComposerJson['scripts']['analyse'] = '@php vendor/bin/alchemy analyse';
+        $appComposerJson['scripts']['ci'] = '@php vendor/bin/alchemy ci';
 
         $appComposerJson['config'] = array_merge($composerConfig, [
             'allow-plugins' => array_merge($composerConfigPlugins, [

@@ -20,10 +20,6 @@ class SetupCommand extends Command
     protected $help = 'This command will help you setup your work environment based on the alchemy.yml configuration file.';
 
     /**
-     * Execute the command.
-     * @return int
-     */
-    /**
      * Forces check/fix behaviour for verb commands (lint = check, fmt = fix)
      */
     protected $modeOverride = null;
@@ -152,7 +148,7 @@ class SetupCommand extends Command
             : '';
 
         if ($parallel) {
-            $this->writeln("<info>  > Running tests in parallel...</info>");
+            $this->writeln('<info>  > Running tests in parallel...</info>');
 
             if ($engine === 'pest') {
                 $flags .= ' --parallel';
@@ -403,7 +399,7 @@ class SetupCommand extends Command
         run: |
           mysql -e 'CREATE DATABASE $dbName;' \
           -u$dbUser -p$dbPassword -P$dbPort";
-                } else if ($database['type'] === 'pgsql') {
+                } elseif ($database['type'] === 'pgsql') {
                     $actionsToWrite[] = "\n
       - name: Initialize Database
         uses: ikalnytskyi/action-setup-postgres@v6

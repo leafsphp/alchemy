@@ -2,44 +2,66 @@
 
 /*
 |--------------------------------------------------------------------------
-| Test Case
+| Alchemy test helpers
 |--------------------------------------------------------------------------
 |
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "uses()" function to bind a different classes or traits.
+| Every test runs inside a throwaway sandbox directory so generators and
+| commands (which work against getcwd()) never touch the real repo.
 |
 */
 
-// uses(Tests\TestCase::class)->in('Feature');
-
-/*
-|--------------------------------------------------------------------------
-| Expectations
-|--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
-*/
-
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Functions
-|--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
-*/
-
-function something()
+function sandboxSetup(): void
 {
-    // ..
+    $GLOBALS['__alchemyTestCwd'] = getcwd();
+    $sandbox = sys_get_temp_dir() . '/alchemy-test-' . bin2hex(random_bytes(6));
+
+    mkdir($sandbox, 0777, true);
+    chdir($sandbox);
+
+    $GLOBALS['__alchemySandbox'] = $sandbox;
+}
+
+function sandboxTeardown(): void
+{
+    chdir($GLOBALS['__alchemyTestCwd']);
+    removeDirectory($GLOBALS['__alchemySandbox']);
+}
+
+function removeDirectory(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+
+    foreach (scandir($dir) as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $path = "$dir/$item";
+        is_dir($path) && !is_link($path) ? removeDirectory($path) : unlink($path);
+    }
+
+    rmdir($dir);
+}
+
+/**
+ * Run the real alchemy binary inside the current sandbox.
+ * @return array{0: int, 1: string} exit code and combined output
+ */
+function alchemy(string $args): array
+{
+    $bin = dirname(__DIR__) . '/bin/alchemy';
+
+    exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . " $args 2>&1", $output, $exit);
+
+    return [$exit, implode("\n", $output)];
+}
+
+function writeComposerJson(array $extra = []): void
+{
+    file_put_contents(
+        getcwd() . '/composer.json',
+        json_encode(array_merge(['name' => 'alchemy/sandbox'], $extra), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+    );
 }

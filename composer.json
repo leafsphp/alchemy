@@ -1,48 +1,60 @@
 {
-	"name": "leafs/alchemy",
-	"version": "5.0.0",
-	"description": "Integrated testing/style fixing tool for your PHP apps",
-	"homepage": "https://leafphp.dev/docs/tooling/testing",
-	"keywords": [
-		"leaf",
-		"php",
-		"testing",
-		"test",
-		"linting",
-		"actions"
-	],
-	"license": "MIT",
-	"authors": [
-		{
-			"name": "Michael Darko",
-			"email": "mickdd22@gmail.com",
-			"homepage": "https://mychi.netlify.app",
-			"role": "Developer"
-		}
-	],
-	"require": {
-		"ext-json": "*",
-		"leafs/fs": "*",
-		"leafs/sprout": "*",
-		"symfony/yaml": "*"
-	},
-	"bin": [
-		"bin/alchemy"
-	],
-	"autoload": {
-		"psr-4": {
-			"Leaf\\Alchemy\\": "src/"
-		},
-		"files": [
-			"src/functions.php"
-		]
-	},
-	"config": {
-		"sort-packages": true,
-		"allow-plugins": {
-			"pestphp/pest-plugin": true
-		}
-	},
-	"minimum-stability": "dev",
-	"prefer-stable": true
+    "name": "leafs/alchemy",
+    "version": "v5.0-dev",
+    "description": "Integrated testing/style fixing tool for your PHP apps",
+    "homepage": "https://leafphp.dev/docs/tooling/testing",
+    "keywords": [
+        "leaf",
+        "php",
+        "testing",
+        "test",
+        "linting",
+        "actions"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Michael Darko",
+            "email": "mickdd22@gmail.com",
+            "homepage": "https://mychi.netlify.app",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "ext-json": "*",
+        "leafs/fs": "*",
+        "leafs/sprout": "*",
+        "symfony/yaml": "*",
+        "php": "^8.0"
+    },
+    "bin": [
+        "bin/alchemy"
+    ],
+    "autoload": {
+        "psr-4": {
+            "Leaf\\Alchemy\\": "src/"
+        },
+        "files": [
+            "src/functions.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "alchemy": "@php bin/alchemy setup",
+        "test": "@php bin/alchemy test",
+        "lint": "@php bin/alchemy lint",
+        "fmt": "@php bin/alchemy fmt",
+        "ci": "@php bin/alchemy ci"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "pestphp/pest": "^3.8"
+    }
 }

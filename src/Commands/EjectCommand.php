@@ -58,8 +58,8 @@ class EjectCommand extends Command
         $engine = Core::get('tests')['engine'] ?? 'pest';
         $appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
 
-        $appComposerJson['scripts']['test'] = "./vendor/bin/$engine";
-        $appComposerJson['scripts']['lint'] = './vendor/bin/php-cs-fixer fix';
+        $appComposerJson['scripts']['test'] = "@php vendor/bin/$engine";
+        $appComposerJson['scripts']['lint'] = '@php vendor/bin/php-cs-fixer fix';
         unset($appComposerJson['scripts']['alchemy'], $appComposerJson['scripts']['actions']);
 
         file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

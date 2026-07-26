@@ -1,0 +1,38 @@
+app:
+  - src
+
+tests:
+  engine: pest
+  paths:
+    - tests
+  files:
+    - '*.test.php'
+
+lint:
+  preset: PSR12
+  rules:
+    single_quote: true
+    no_unused_imports: true
+    array_syntax:
+      syntax: short
+
+actions:
+  run:
+    - lint
+    - tests
+  os:
+    - ubuntu-latest
+    - macos-latest
+    - windows-latest
+  php:
+    extensions: json, zip
+    versions:
+      - '8.1'
+      - '8.2'
+      - '8.3'
+  events:
+    - push
+    - pull_request
+  tests:
+    coverage:
+      actions: false
