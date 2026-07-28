@@ -189,13 +189,9 @@ class SetupCommand extends Command
             }
         }
 
-        // never clobber a hand-written phpunit.xml — park it and restore after the run
-        $userPhpunitConfig = file_exists(getcwd() . '/phpunit.xml');
-
-        if ($userPhpunitConfig) {
-            \Leaf\FS\File::move(getcwd() . '/phpunit.xml', getcwd() . '/.alchemy/phpunit.xml.user');
-        }
-
+        // the generated config lives in .alchemy/phpunit.xml — a hand-written
+        // phpunit.xml at the root is never touched (it's only used when
+        // alchemy.yml has no tests section, handled above)
         Core::generateTestFiles();
 
         $this->writeln("<comment>  > Using $engine for tests ...</comment>");
@@ -226,24 +222,12 @@ class SetupCommand extends Command
             }
         }
 
-        try {
-            $testProcess = sprout()
-                ->process(getcwd() . "/vendor/bin/$binary $flags")
-                ->setTimeout(null)
-                ->run(function ($type, $line): void {
-                    $this->write($line);
-                });
-        } finally {
-            \Leaf\FS\File::delete(getcwd() . '/phpunit.xml');
-
-            if ($userPhpunitConfig) {
-                \Leaf\FS\File::move(getcwd() . '/.alchemy/phpunit.xml.user', getcwd() . '/phpunit.xml');
-            }
-
-            if (file_exists(getcwd() . '/.phpunit.result.cache')) {
-                \Leaf\FS\File::move(getcwd() . '/.phpunit.result.cache', getcwd() . '/.alchemy/.phpunit.result.cache');
-            }
-        }
+        $testProcess = sprout()
+            ->process(getcwd() . "/vendor/bin/$binary --configuration " . getcwd() . '/.alchemy/phpunit.xml' . ($flags ? " $flags" : ''))
+            ->setTimeout(null)
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         if ($testProcess !== 0) {
             $this->writeln('<error>Tests failed. Check your code and try again.</error>');
@@ -294,16 +278,12 @@ class SetupCommand extends Command
 
         $this->writeln($check ? "<comment>Checking for pending refactors...</comment>\n" : "<comment>Running refactors...</comment>\n");
 
-        try {
-            $refactorProcess = sprout()
-                ->process(getcwd() . '/vendor/bin/rector process --config=.rector.dist.php' . ($check ? ' --dry-run' : ''))
-                ->setTimeout(null)
-                ->run(function ($type, $line): void {
-                    $this->write($line);
-                });
-        } finally {
-            \Leaf\FS\File::delete(getcwd() . '/.rector.dist.php');
-        }
+        $refactorProcess = sprout()
+            ->process(getcwd() . '/vendor/bin/rector process --config=' . getcwd() . '/.alchemy/.rector.dist.php' . ($check ? ' --dry-run' : ''))
+            ->setTimeout(null)
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         if ($refactorProcess !== 0) {
             $this->writeln($check
@@ -317,7 +297,16 @@ class SetupCommand extends Command
 
     protected function runAnalyser()
     {
-        if (!Core::get('analyse')) {
+        $userPhpstanConfig = null;
+
+        foreach (['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'] as $phpstanFile) {
+            if (file_exists(getcwd() . '/' . $phpstanFile)) {
+                $userPhpstanConfig = $phpstanFile;
+                break;
+            }
+        }
+
+        if (!Core::get('analyse') && !$userPhpstanConfig) {
             $this->writeln('<comment>No `analyse` section found in alchemy.yml. Add one to use PHPStan.</comment>');
             return 0;
         }
@@ -333,20 +322,24 @@ class SetupCommand extends Command
             $this->writeln('<info>PHPStan installed successfully!</info>');
         }
 
-        Core::generateAnalyseFiles();
+        // a project with its own phpstan config and no analyse section
+        // runs on its own setup, baseline and all
+        if (!Core::get('analyse') && $userPhpstanConfig) {
+            $this->writeln("<comment>Using your existing $userPhpstanConfig (alchemy.yml has no analyse section)...</comment>\n");
+            $analyseConfigPath = getcwd() . '/' . $userPhpstanConfig;
+        } else {
+            Core::generateAnalyseFiles();
+            $analyseConfigPath = getcwd() . '/.alchemy/.phpstan.dist.neon';
+        }
 
         $this->writeln("<comment>Analysing code...</comment>\n");
 
-        try {
-            $analyseProcess = sprout()
-                ->process(getcwd() . '/vendor/bin/phpstan analyse --configuration=.phpstan.dist.neon --no-progress --ansi')
-                ->setTimeout(null)
-                ->run(function ($type, $line): void {
-                    $this->write($line);
-                });
-        } finally {
-            \Leaf\FS\File::delete(getcwd() . '/.phpstan.dist.neon');
-        }
+        $analyseProcess = sprout()
+            ->process(getcwd() . "/vendor/bin/phpstan analyse --configuration=$analyseConfigPath --no-progress --ansi")
+            ->setTimeout(null)
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         if ($analyseProcess !== 0) {
             $this->writeln('<error>Static analysis found issues. Fix them and run `composer run analyse` again.</error>');
@@ -399,20 +392,12 @@ class SetupCommand extends Command
 
         $this->writeln($check ? "<comment>Checking code style...</comment>\n" : "<comment>Running linter...</comment>\n");
 
-        try {
-            $lintProcess = sprout()
-                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php$lintFlags")
-                ->setTimeout(null)
-                ->run(function ($type, $line): void {
-                    $this->write($line);
-                });
-        } finally {
-            \Leaf\FS\File::delete(getcwd() . '/.php_cs.dist.php');
-
-            if (file_exists(getcwd() . '/.php-cs-fixer.cache')) {
-                \Leaf\FS\File::move(getcwd() . '/.php-cs-fixer.cache', getcwd() . '/.alchemy/.php-cs-fixer.cache');
-            }
-        }
+        $lintProcess = sprout()
+            ->process(getcwd() . '/vendor/bin/php-cs-fixer fix --config=' . getcwd() . "/.alchemy/.php_cs.dist.php$lintFlags")
+            ->setTimeout(null)
+            ->run(function ($type, $line): void {
+                $this->write($line);
+            });
 
         if ($lintProcess !== 0) {
             $this->writeln($check

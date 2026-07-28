@@ -35,13 +35,20 @@ class Core
         return preg_replace('/"__DIR__\s*\.\s*\'(.*?)\'"/', '__DIR__ . \'$1\'', $parsed);
     }
 
-    public static function generateTestFiles()
+    public static function generateTestFiles(bool $ejected = false)
     {
         $config = static::get();
 
-        if (file_exists(getcwd() . '/.alchemy/.phpunit.result.cache')) {
-            \Leaf\FS\File::move(getcwd() . '/.alchemy/.phpunit.result.cache', getcwd() . '/.phpunit.result.cache');
+        // heal residue from interrupted runs of older alchemy versions —
+        // but never during eject, whose whole point is root config files
+        if (!$ejected) {
+            static::cleanStaleRootConfigs();
         }
+
+        // generated configs live inside .alchemy so the project root stays
+        // clean — even if a run is killed halfway. eject writes real,
+        // portable configs to the root on purpose.
+        $root = $ejected ? '' : getcwd() . '/';
 
         $testsConfig = $config['tests'] ?? [];
         $appPathsConfig = $config['app'] ?? [__DIR__];
@@ -57,10 +64,12 @@ class Core
 
         $attributes = array_merge([
             'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
-            'xsi:noNamespaceSchemaLocation' => './vendor/phpunit/phpunit/phpunit.xsd',
-            'bootstrap' => 'vendor/autoload.php',
+            'xsi:noNamespaceSchemaLocation' => $root . './vendor/phpunit/phpunit/phpunit.xsd',
+            // phpunit resolves these relative to the config file, so the
+            // in-.alchemy config gets absolute paths
+            'bootstrap' => $root . 'vendor/autoload.php',
             'colors' => true,
-            'cacheDirectory' => '.alchemy',
+            'cacheDirectory' => $root . '.alchemy',
         ], $attributeOverrides);
 
         $renderedAttributes = [];
@@ -93,7 +102,7 @@ class Core
             foreach ((array) ($suite['paths'] ?? []) as $suiteDir) {
                 foreach ((array) ($suite['files'] ?? $filePatterns) as $pattern) {
                     $suffix = ltrim($pattern, '*');
-                    $entries .= "<directory suffix=\"$suffix\">$suiteDir</directory>";
+                    $entries .= "<directory suffix=\"$suffix\">$root$suiteDir</directory>";
                 }
             }
 
@@ -109,7 +118,7 @@ class Core
         $coverageExcludes = '';
 
         foreach ($appPathsConfig as $appDir) {
-            $coverageIncludes .= "<directory suffix=\".php\">$appDir</directory>";
+            $coverageIncludes .= "<directory suffix=\".php\">$root$appDir</directory>";
         }
 
         foreach ((array) ($testsConfig['coverage']['exclude'] ?? []) as $excluded) {
@@ -163,7 +172,46 @@ class Core
             $phpunitXml
         );
 
-        \Leaf\FS\File::create(getcwd() . '/phpunit.xml', $phpunitXml, ['overwrite' => true]);
+        if (!$ejected) {
+            static::ensureAlchemyDir();
+        }
+
+        \Leaf\FS\File::create(
+            $ejected ? getcwd() . '/phpunit.xml' : getcwd() . '/.alchemy/phpunit.xml',
+            $phpunitXml,
+            ['overwrite' => true]
+        );
+    }
+
+    /**
+     * Older alchemy versions generated configs at the project root and cleaned
+     * them after each run — a killed run could leave them behind. Remove any
+     * such residue (only files carrying alchemy's generation signature).
+     */
+    /**
+     * Generated configs live inside .alchemy — make sure it exists.
+     */
+    protected static function ensureAlchemyDir(): void
+    {
+        if (!is_dir(getcwd() . '/.alchemy')) {
+            mkdir(getcwd() . '/.alchemy', 0777, true);
+        }
+    }
+
+    public static function cleanStaleRootConfigs(): void
+    {
+        $rootPhpunit = getcwd() . '/phpunit.xml';
+
+        if (file_exists($rootPhpunit) && strpos((string) file_get_contents($rootPhpunit), 'cacheDirectory=".alchemy"') !== false) {
+            \Leaf\FS\File::delete($rootPhpunit);
+        }
+
+        // these dotted names were only ever alchemy-generated
+        foreach (['.php_cs.dist.php', '.rector.dist.php', '.phpstan.dist.neon'] as $staleConfig) {
+            if (file_exists(getcwd() . '/' . $staleConfig)) {
+                \Leaf\FS\File::delete(getcwd() . '/' . $staleConfig);
+            }
+        }
     }
 
     protected static function xmlValue($value): string
@@ -224,14 +272,26 @@ class Core
 
         $level = $analyseConfig['level'] ?? 5;
         $paths = (array) ($analyseConfig['paths'] ?? $config['app'] ?? ['src']);
+        $root = getcwd();
 
-        $neon = "parameters:\n";
+        $neon = '';
+
+        // a phpstan baseline is a list of known, accepted errors — respect the
+        // conventional file, or whatever `analyse.baseline` points at
+        $baseline = $analyseConfig['baseline'] ?? 'phpstan-baseline.neon';
+
+        if ($baseline && file_exists("$root/$baseline")) {
+            $neon .= "includes:\n";
+            $neon .= "    - $root/$baseline\n";
+        }
+
+        $neon .= "parameters:\n";
         $neon .= "    level: $level\n";
-        $neon .= "    tmpDir: .alchemy/phpstan\n";
+        $neon .= "    tmpDir: $root/.alchemy/phpstan\n";
         $neon .= "    paths:\n";
 
         foreach ($paths as $path) {
-            $neon .= "        - $path\n";
+            $neon .= "        - $root/$path\n";
         }
 
         if (!empty($analyseConfig['ignore'])) {
@@ -242,7 +302,8 @@ class Core
             }
         }
 
-        \Leaf\FS\File::create(getcwd() . '/.phpstan.dist.neon', $neon, ['overwrite' => true]);
+        static::ensureAlchemyDir();
+        \Leaf\FS\File::create(getcwd() . '/.alchemy/.phpstan.dist.neon', $neon, ['overwrite' => true]);
     }
 
     public static function generateRefactorFiles()
@@ -252,12 +313,13 @@ class Core
 
         $paths = [];
 
+        // generated config lives in .alchemy — project root is one level up
         foreach ((array) ($config['app'] ?? []) as $appDir) {
-            $paths[] = "__DIR__ . '/$appDir'";
+            $paths[] = "dirname(__DIR__) . '/$appDir'";
         }
 
         if (!$paths) {
-            $paths = ['__DIR__'];
+            $paths = ['dirname(__DIR__)'];
         }
 
         $chain = '';
@@ -303,7 +365,7 @@ class Core
         foreach ((array) ($refactorConfig['skip'] ?? []) as $skip) {
             $skips[] = strpos($skip, '\\') !== false
                 ? '\\' . ltrim($skip, '\\') . '::class'
-                : "__DIR__ . '/$skip'";
+                : "dirname(__DIR__) . '/$skip'";
         }
 
         if ($skips) {
@@ -328,16 +390,17 @@ class Core
             $rectorDist
         );
 
-        \Leaf\FS\File::create(getcwd() . '/.rector.dist.php', $rectorDist, ['overwrite' => true]);
+        static::ensureAlchemyDir();
+        \Leaf\FS\File::create(getcwd() . '/.alchemy/.rector.dist.php', $rectorDist, ['overwrite' => true]);
     }
 
-    public static function generateLintFiles()
+    public static function generateLintFiles(bool $ejected = false)
     {
         $config = static::get();
         $lintConfig = $config['lint'];
 
-        if (file_exists(getcwd() . '/.alchemy/.php-cs-fixer.cache')) {
-            \Leaf\FS\File::move(getcwd() . '/.alchemy/.php-cs-fixer.cache', getcwd() . '/.php-cs-fixer.cache');
+        if (!$ejected) {
+            static::cleanStaleRootConfigs();
         }
 
         $lintRules = $lintConfig['rules'] ?? [];
@@ -353,12 +416,16 @@ class Core
         $lintPaths = [];
         $lintRules["@$lintPreset"] = true;
 
+        // the generated config lives in .alchemy, so the project root is one
+        // level up from __DIR__; ejected configs sit at the root itself
+        $rootExpr = $ejected ? '__DIR__' : 'dirname(__DIR__)';
+
         if ($appPathsConfig) {
             foreach ($appPathsConfig as $appDir) {
-                $lintPaths[] = "__DIR__ . '/$appDir'";
+                $lintPaths[] = "$rootExpr . '/$appDir'";
             }
         } else {
-            $lintPaths = ['__DIR__'];
+            $lintPaths = [$rootExpr];
         }
 
         $lintExcludes = '';
@@ -374,6 +441,23 @@ class Core
             $phpcsFixerDist
         );
 
-        \Leaf\FS\File::create(getcwd() . '/.php_cs.dist.php', $phpcsFixerDist, ['overwrite' => true]);
+        if (!$ejected) {
+            // keep the fixer cache inside .alchemy too
+            $phpcsFixerDist = str_replace(
+                '->setFinder($finder);',
+                "->setCacheFile(__DIR__ . '/.php-cs-fixer.cache')\n  ->setFinder(\$finder);",
+                $phpcsFixerDist
+            );
+        }
+
+        if (!$ejected) {
+            static::ensureAlchemyDir();
+        }
+
+        \Leaf\FS\File::create(
+            $ejected ? getcwd() . '/.php_cs.dist.php' : getcwd() . '/.alchemy/.php_cs.dist.php',
+            $phpcsFixerDist,
+            ['overwrite' => true]
+        );
     }
 }

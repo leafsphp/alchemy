@@ -15,11 +15,11 @@ test('generated phpunit config uses the .test.php suffix by default', function (
     Core::set(['app' => ['src'], 'tests' => ['paths' => ['tests']]]);
     Core::generateTestFiles();
 
-    $xml = file_get_contents(getcwd() . '/phpunit.xml');
+    $xml = file_get_contents(getcwd() . '/.alchemy/phpunit.xml');
 
     expect($xml)->toContain('suffix=".test.php"')
         ->toContain('<testsuite name="Test Suite tests">')
-        ->toContain('<directory suffix=".php">src</directory>');
+        ->toContain('<directory suffix=".php">' . getcwd() . '/src</directory>');
 });
 
 test('named suites render with per-suite files and excludes', function () {
@@ -34,10 +34,10 @@ test('named suites render with per-suite files and excludes', function () {
     ]);
     Core::generateTestFiles();
 
-    $xml = file_get_contents(getcwd() . '/phpunit.xml');
+    $xml = file_get_contents(getcwd() . '/.alchemy/phpunit.xml');
 
-    expect($xml)->toContain('<testsuite name="Unit"><directory suffix=".test.php">tests/unit</directory><exclude>tests/unit/legacy</exclude></testsuite>')
-        ->toContain('<testsuite name="Feature"><directory suffix="Test.php">tests/feature</directory></testsuite>');
+    expect($xml)->toContain('<testsuite name="Unit"><directory suffix=".test.php">' . getcwd() . '/tests/unit</directory><exclude>tests/unit/legacy</exclude></testsuite>')
+        ->toContain('<testsuite name="Feature"><directory suffix="Test.php">' . getcwd() . '/tests/feature</directory></testsuite>');
 });
 
 test('phpunit root attributes pass through verbatim from tests.config', function () {
@@ -49,12 +49,12 @@ test('phpunit root attributes pass through verbatim from tests.config', function
     ]);
     Core::generateTestFiles();
 
-    $xml = file_get_contents(getcwd() . '/phpunit.xml');
+    $xml = file_get_contents(getcwd() . '/.alchemy/phpunit.xml');
 
     expect($xml)->toContain('stopOnFailure="true"')
         ->toContain('executionOrder="random"')
-        ->toContain('bootstrap="vendor/autoload.php"')
-        ->toContain('cacheDirectory=".alchemy"');
+        ->toContain('bootstrap="' . getcwd() . '/vendor/autoload.php"')
+        ->toContain('cacheDirectory="' . getcwd() . '/.alchemy"');
 });
 
 test('the php block renders env, ini and server values', function () {
@@ -68,7 +68,7 @@ test('the php block renders env, ini and server values', function () {
     ]);
     Core::generateTestFiles();
 
-    $xml = file_get_contents(getcwd() . '/phpunit.xml');
+    $xml = file_get_contents(getcwd() . '/.alchemy/phpunit.xml');
 
     expect($xml)->toContain('<env name="APP_ENV" value="testing"/>')
         ->toContain('<ini name="memory_limit" value="512M"/>')
@@ -82,7 +82,7 @@ test('coverage excludes distinguish files from directories', function () {
     ]);
     Core::generateTestFiles();
 
-    $xml = file_get_contents(getcwd() . '/phpunit.xml');
+    $xml = file_get_contents(getcwd() . '/.alchemy/phpunit.xml');
 
     expect($xml)->toContain('<exclude><directory>src/legacy</directory><file>src/Skipped.php</file></exclude>');
 });
@@ -93,9 +93,9 @@ test('generators overwrite their previous output', function () {
     Core::set(['app' => ['lib'], 'tests' => []]);
     Core::generateTestFiles();
 
-    expect(file_get_contents(getcwd() . '/phpunit.xml'))
-        ->toContain('<directory suffix=".php">lib</directory>')
-        ->not->toContain('<directory suffix=".php">src</directory>');
+    expect(file_get_contents(getcwd() . '/.alchemy/phpunit.xml'))
+        ->toContain('<directory suffix=".php">' . getcwd() . '/lib</directory>')
+        ->not->toContain('<directory suffix=".php">' . getcwd() . '/src</directory>');
 });
 
 test('lint config renders preset, rules and excludes', function () {
@@ -109,12 +109,13 @@ test('lint config renders preset, rules and excludes', function () {
     ]);
     Core::generateLintFiles();
 
-    $config = file_get_contents(getcwd() . '/.php_cs.dist.php');
+    $config = file_get_contents(getcwd() . '/.alchemy/.php_cs.dist.php');
 
     expect($config)->toContain('"@PSR12" => true')
         ->toContain('"single_quote" => true')
         ->toContain('->exclude(')
-        ->toContain("__DIR__ . '/src'");
+        ->toContain("dirname(__DIR__) . '/src'")
+        ->toContain('->setCacheFile(');
 });
 
 test('rector config renders php sets, prepared sets, skips and rules', function () {
@@ -129,11 +130,11 @@ test('rector config renders php sets, prepared sets, skips and rules', function 
     ]);
     Core::generateRefactorFiles();
 
-    $config = file_get_contents(getcwd() . '/.rector.dist.php');
+    $config = file_get_contents(getcwd() . '/.alchemy/.rector.dist.php');
 
     expect($config)->toContain('->withPhpSets(php82: true)')
         ->toContain('->withPreparedSets(deadCode: true, codeQuality: true)')
-        ->toContain("__DIR__ . '/src/legacy'")
+        ->toContain("dirname(__DIR__) . '/src/legacy'")
         ->toContain('\Rector\Php80\Rector\Class_\SomeRector::class')
         ->toContain('->withRules([\Rector\Php81\Rector\Class_\OtherRector::class])');
 });
@@ -145,11 +146,11 @@ test('phpstan config renders level, paths and ignores', function () {
     ]);
     Core::generateAnalyseFiles();
 
-    $neon = file_get_contents(getcwd() . '/.phpstan.dist.neon');
+    $neon = file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon');
 
     expect($neon)->toContain('level: 7')
-        ->toContain("- src\n")
-        ->toContain("- lib\n")
+        ->toContain('- ' . getcwd() . "/src\n")
+        ->toContain('- ' . getcwd() . "/lib\n")
         ->toContain("- '#unknown method#'")
-        ->toContain('tmpDir: .alchemy/phpstan');
+        ->toContain('tmpDir: ' . getcwd() . '/.alchemy/phpstan');
 });

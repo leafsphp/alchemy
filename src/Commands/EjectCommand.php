@@ -38,8 +38,8 @@ class EjectCommand extends Command
 
         \Leaf\FS\File::delete(getcwd() . '/.php-cs-fixer.dist.php');
 
-        Core::generateTestFiles();
-        Core::generateLintFiles();
+        Core::generateTestFiles(true);
+        Core::generateLintFiles(true);
 
         // php-cs-fixer picks .php-cs-fixer.dist.php up without any flags
         \Leaf\FS\File::move(getcwd() . '/.php_cs.dist.php', getcwd() . '/.php-cs-fixer.dist.php');
