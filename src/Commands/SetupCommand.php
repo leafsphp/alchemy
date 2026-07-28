@@ -159,6 +159,7 @@ class SetupCommand extends Command
 
             $testProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/$engine $userFlags")
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
@@ -228,6 +229,7 @@ class SetupCommand extends Command
         try {
             $testProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/$binary $flags")
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
@@ -295,6 +297,7 @@ class SetupCommand extends Command
         try {
             $refactorProcess = sprout()
                 ->process(getcwd() . '/vendor/bin/rector process --config=.rector.dist.php' . ($check ? ' --dry-run' : ''))
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
@@ -337,6 +340,7 @@ class SetupCommand extends Command
         try {
             $analyseProcess = sprout()
                 ->process(getcwd() . '/vendor/bin/phpstan analyse --configuration=.phpstan.dist.neon --no-progress --ansi')
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
@@ -373,6 +377,7 @@ class SetupCommand extends Command
 
             $lintProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : ''))
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
@@ -397,6 +402,7 @@ class SetupCommand extends Command
         try {
             $lintProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=.php_cs.dist.php$lintFlags")
+                ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
                 });
