@@ -154,3 +154,26 @@ test('phpstan config renders level, paths and ignores', function () {
         ->toContain("- '#unknown method#'")
         ->toContain('tmpDir: ' . getcwd() . '/.alchemy/phpstan');
 });
+
+test('phpstan config passes unknown analyse keys through as parameters', function () {
+    Core::set([
+        'app' => ['src'],
+        'analyse' => [
+            'level' => 8,
+            'includes' => ['vendor/phpstan/phpstan/conf/bleedingEdge.neon'],
+            'excludePaths' => ['tests'],
+            'reportUnmatchedIgnoredErrors' => true,
+            'treatPhpDocTypesAsCertain' => false,
+            'universalObjectCratesClasses' => ['Leaf\Config'],
+        ],
+    ]);
+    Core::generateAnalyseFiles();
+
+    $neon = file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon');
+
+    expect($neon)->toContain('- ' . getcwd() . "/vendor/phpstan/phpstan/conf/bleedingEdge.neon\n")
+        ->toContain("    excludePaths:\n        - " . getcwd() . "/tests\n")
+        ->toContain("    reportUnmatchedIgnoredErrors: true\n")
+        ->toContain("    treatPhpDocTypesAsCertain: false\n")
+        ->toContain("    universalObjectCratesClasses:\n        - 'Leaf\\Config'\n");
+});

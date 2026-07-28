@@ -280,9 +280,22 @@ class Core
         // conventional file, or whatever `analyse.baseline` points at
         $baseline = $analyseConfig['baseline'] ?? 'phpstan-baseline.neon';
 
+        $includes = [];
+
         if ($baseline && file_exists("$root/$baseline")) {
+            $includes[] = "$root/$baseline";
+        }
+
+        foreach ((array) ($analyseConfig['includes'] ?? []) as $include) {
+            $includes[] = strpos($include, '/') === 0 ? $include : "$root/$include";
+        }
+
+        if ($includes) {
             $neon .= "includes:\n";
-            $neon .= "    - $root/$baseline\n";
+
+            foreach ($includes as $include) {
+                $neon .= "    - $include\n";
+            }
         }
 
         $neon .= "parameters:\n";
@@ -294,6 +307,14 @@ class Core
             $neon .= "        - $root/$path\n";
         }
 
+        if (!empty($analyseConfig['excludePaths'])) {
+            $neon .= "    excludePaths:\n";
+
+            foreach ((array) $analyseConfig['excludePaths'] as $path) {
+                $neon .= '        - ' . (strpos($path, '/') === 0 ? $path : "$root/$path") . "\n";
+            }
+        }
+
         if (!empty($analyseConfig['ignore'])) {
             $neon .= "    ignoreErrors:\n";
 
@@ -302,8 +323,55 @@ class Core
             }
         }
 
+        // any other key under `analyse` is passed straight through as a
+        // phpstan parameter — the section is not limited to the keys above
+        $handled = ['level', 'paths', 'ignore', 'baseline', 'includes', 'excludePaths'];
+        $extras = array_diff_key($analyseConfig, array_flip($handled));
+
+        if ($extras) {
+            $neon .= static::neonBlock($extras, 1);
+        }
+
         static::ensureAlchemyDir();
         \Leaf\FS\File::create(getcwd() . '/.alchemy/.phpstan.dist.neon', $neon, ['overwrite' => true]);
+    }
+
+    /**
+     * Render a config array as an indented neon block
+     */
+    protected static function neonBlock(array $data, int $depth): string
+    {
+        $indent = str_repeat('    ', $depth);
+        $isList = array_keys($data) === range(0, count($data) - 1);
+        $block = '';
+
+        foreach ($data as $key => $value) {
+            $label = $isList ? "$indent-" : "$indent$key:";
+
+            if (is_array($value)) {
+                $block .= "$label\n" . static::neonBlock($value, $depth + 1);
+            } else {
+                $block .= "$label " . static::neonValue($value) . "\n";
+            }
+        }
+
+        return $block;
+    }
+
+    /**
+     * Render a scalar as a neon value
+     */
+    protected static function neonValue($value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return "'" . str_replace("'", "''", (string) $value) . "'";
     }
 
     public static function generateRefactorFiles()
