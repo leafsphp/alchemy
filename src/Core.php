@@ -290,6 +290,9 @@ class Core
             $includes[] = strpos($include, '/') === 0 ? $include : "$root/$include";
         }
 
+        // the baseline may also be listed explicitly under `includes`
+        $includes = array_unique($includes);
+
         if ($includes) {
             $neon .= "includes:\n";
 
@@ -382,7 +385,7 @@ class Core
         $paths = [];
 
         // generated config lives in .alchemy — project root is one level up
-        foreach ((array) ($config['app'] ?? []) as $appDir) {
+        foreach ((array) ($refactorConfig['paths'] ?? $config['app'] ?? []) as $appDir) {
             $paths[] = "dirname(__DIR__) . '/$appDir'";
         }
 
@@ -399,6 +402,32 @@ class Core
             $chain .= "\n    ->withPhpSets()";
         } elseif ($phpVersion) {
             $chain .= "\n    ->withPhpSets(php" . str_replace('.', '', (string) $phpVersion) . ': true)';
+        }
+
+        // downgrade target: rewrite syntax DOWN to an older php version
+        if (!empty($refactorConfig['downgrade'])) {
+            $chain .= "\n    ->withDowngradeSets(php" . str_replace('.', '', (string) $refactorConfig['downgrade']) . ': true)';
+        }
+
+        if (!empty($refactorConfig['fluent-new-line'])) {
+            $chain .= "\n    ->withFluentCallNewLine()";
+        }
+
+        // import-names: true enables the lot; a map tunes individual flags
+        $importNames = $refactorConfig['import-names'] ?? null;
+
+        if ($importNames) {
+            $importFlags = is_array($importNames) ? $importNames : [];
+            $asBool = function ($value) {
+                return $value ? 'true' : 'false';
+            };
+
+            $chain .= "\n    ->withImportNames("
+                . 'importNames: ' . $asBool($importFlags['import'] ?? true)
+                . ', importDocBlockNames: ' . $asBool($importFlags['doc-blocks'] ?? true)
+                . ', importShortClasses: ' . $asBool($importFlags['short-classes'] ?? true)
+                . ', removeUnusedImports: ' . $asBool($importFlags['remove-unused'] ?? true)
+                . ')';
         }
 
         // rector's prepared sets, kebab-cased in yml

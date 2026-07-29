@@ -256,7 +256,16 @@ class SetupCommand extends Command
 
     protected function runRefactor()
     {
-        if (!Core::get('refactor')) {
+        $userRectorConfig = null;
+
+        foreach (['rector.php', 'rector.dist.php'] as $rectorFile) {
+            if (file_exists(getcwd() . '/' . $rectorFile)) {
+                $userRectorConfig = $rectorFile;
+                break;
+            }
+        }
+
+        if (!Core::get('refactor') && !$userRectorConfig) {
             $this->writeln('<comment>No `refactor` section found in alchemy.yml. Add one to use Rector.</comment>');
             return 0;
         }
@@ -272,14 +281,22 @@ class SetupCommand extends Command
             $this->writeln('<info>Rector installed successfully!</info>');
         }
 
-        Core::generateRefactorFiles();
+        // a project with its own rector config and no refactor section
+        // runs on its own setup — same contract as analyse
+        if (!Core::get('refactor') && $userRectorConfig) {
+            $this->writeln("<comment>Using your existing $userRectorConfig (alchemy.yml has no refactor section)...</comment>\n");
+            $refactorConfigPath = getcwd() . '/' . $userRectorConfig;
+        } else {
+            Core::generateRefactorFiles();
+            $refactorConfigPath = getcwd() . '/.alchemy/.rector.dist.php';
+        }
 
         $check = $this->checkMode();
 
         $this->writeln($check ? "<comment>Checking for pending refactors...</comment>\n" : "<comment>Running refactors...</comment>\n");
 
         $refactorProcess = sprout()
-            ->process(getcwd() . '/vendor/bin/rector process --config=' . getcwd() . '/.alchemy/.rector.dist.php' . ($check ? ' --dry-run' : ''))
+            ->process(getcwd() . '/vendor/bin/rector process --config=' . $refactorConfigPath . ($check ? ' --dry-run' : ''))
             ->setTimeout(null)
             ->run(function ($type, $line): void {
                 $this->write($line);

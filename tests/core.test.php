@@ -139,6 +139,26 @@ test('rector config renders php sets, prepared sets, skips and rules', function 
         ->toContain('->withRules([\Rector\Php81\Rector\Class_\OtherRector::class])');
 });
 
+test('rector config renders downgrade, fluent new line, import names and custom paths', function () {
+    Core::set([
+        'app' => ['src'],
+        'refactor' => [
+            'paths' => ['src', 'tests'],
+            'downgrade' => '8.0',
+            'fluent-new-line' => true,
+            'import-names' => true,
+        ],
+    ]);
+    Core::generateRefactorFiles();
+
+    $config = file_get_contents(getcwd() . '/.alchemy/.rector.dist.php');
+
+    expect($config)->toContain('->withDowngradeSets(php80: true)')
+        ->toContain('->withFluentCallNewLine()')
+        ->toContain('->withImportNames(importNames: true, importDocBlockNames: true, importShortClasses: true, removeUnusedImports: true)')
+        ->toContain("dirname(__DIR__) . '/src', dirname(__DIR__) . '/tests'");
+});
+
 test('phpstan config renders level, paths and ignores', function () {
     Core::set([
         'app' => ['src', 'lib'],

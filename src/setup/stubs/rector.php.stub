@@ -4,4 +4,4 @@ use Rector\Config\RectorConfig;
 
 return RectorConfig::configure()
     ->withPaths(REFACTOR.PATHS)
-    ->withCache(__DIR__ . '/.alchemy/rector')REFACTOR.CHAIN;
+    ->withCache(__DIR__ . '/rector')REFACTOR.CHAIN;
