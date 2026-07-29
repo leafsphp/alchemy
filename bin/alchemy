@@ -23,6 +23,7 @@ $app = sprout()->createApp([
 ]);
 
 $app->register(new Leaf\Alchemy\Commands\InitCommand);
+$app->register(new Leaf\Alchemy\Commands\AllCommand);
 $app->register(new Leaf\Alchemy\Commands\TestCommand);
 $app->register(new Leaf\Alchemy\Commands\LintCommand);
 $app->register(new Leaf\Alchemy\Commands\FmtCommand);

@@ -46,25 +46,48 @@ class SetupCommand extends Command
         }
 
         if (!$this->option('test') && !$this->option('lint') && !$this->option('refactor') && !$this->option('actions')) {
-            $this->runTests();
-            $this->runLinter();
+            $this->writeln("<comment>`alchemy setup` is deprecated — use `alchemy all` to run everything in alchemy.yml.</comment>\n");
 
-            // rector rewrites code and phpstan needs a chosen level,
-            // so they only join the pipeline when configured
-            if (Core::get('refactor')) {
-                $this->runRefactor();
-            }
-
-            if (Core::get('analyse')) {
-                $this->runAnalyser();
-            }
-
-            $this->generateActions();
+            return $this->runAll();
         }
 
-        $this->writeln('<info>Alchemy setup successfully.</info>');
-
         return 0;
+    }
+
+    /**
+     * Run every tool present in alchemy.yml — nothing more, nothing less.
+     * A section's presence (map or pinned file) is what opts it in.
+     */
+    protected function runAll(): int
+    {
+        $status = 0;
+
+        if (Core::get('tests')) {
+            set_time_limit(0);
+            $status = $this->runTests() ?: $status;
+        }
+
+        if (Core::get('lint')) {
+            $status = $this->runLinter() ?: $status;
+        }
+
+        if (Core::get('refactor')) {
+            $status = $this->runRefactor() ?: $status;
+        }
+
+        if (Core::get('analyse')) {
+            $status = $this->runAnalyser() ?: $status;
+        }
+
+        if (Core::get('actions')) {
+            $status = $this->generateActions() ?: $status;
+        }
+
+        if ($status === 0) {
+            $this->writeln('<info>Everything in alchemy.yml ran clean. ✔</info>');
+        }
+
+        return $status;
     }
 
     /**
@@ -110,6 +133,17 @@ class SetupCommand extends Command
         return null;
     }
 
+    /**
+     * A section set to a string pins that tool to the named config file —
+     * the recorded "use my file as-is" choice. A map is alchemy-managed.
+     */
+    protected function pinnedConfig(string $tool): ?string
+    {
+        $section = Core::get($tool);
+
+        return (is_string($section) && $section !== '') ? $section : null;
+    }
+
     protected function checkMode(): bool
     {
         if ($this->modeOverride !== null) {
@@ -121,13 +155,14 @@ class SetupCommand extends Command
 
     protected function runTests()
     {
-        $config = Core::get('tests');
-        $userConfig = $this->userEngineConfig('tests');
+        $config = is_array(Core::get('tests')) ? Core::get('tests') : [];
+        $userConfig = $this->pinnedConfig('tests') ?? $this->userEngineConfig('tests');
 
         $engine = $config['engine'] ?? 'pest';
         $parallel = $config['parallel'] ?? false;
 
-        // a project with its own phpunit.xml and no tests section runs on its own config
+        // a pinned config file or a project with its own phpunit.xml and no
+        // tests section runs on its own config
         if ($userConfig) {
             $engine = file_exists(getcwd() . '/vendor/bin/phpunit') && !file_exists(getcwd() . '/vendor/bin/pest') ? 'phpunit' : 'pest';
         }
@@ -150,9 +185,10 @@ class SetupCommand extends Command
         }
 
         if ($userConfig) {
-            $this->writeln('<comment>  > Using your existing phpunit.xml (alchemy.yml has no tests section)...</comment>');
+            $this->writeln("<comment>  > Using your existing $userConfig...</comment>");
 
-            $userFlags = $engine === 'pest' ? '--colors=always' : '';
+            $userFlags = '--configuration ' . getcwd() . "/$userConfig";
+            $userFlags .= $engine === 'pest' ? ' --colors=always' : '';
             $userFlags .= $this->option('flags')
                 ? (' --' . implode(' --', explode(',', $this->option('flags'))))
                 : '';
@@ -281,9 +317,12 @@ class SetupCommand extends Command
             $this->writeln('<info>Rector installed successfully!</info>');
         }
 
-        // a project with its own rector config and no refactor section
-        // runs on its own setup — same contract as analyse
-        if (!Core::get('refactor') && $userRectorConfig) {
+        // a pinned config file or a project with its own rector config and
+        // no refactor section runs on its own setup — same contract as analyse
+        if ($pinned = $this->pinnedConfig('refactor')) {
+            $this->writeln("<comment>Using your existing $pinned...</comment>\n");
+            $refactorConfigPath = getcwd() . '/' . $pinned;
+        } elseif (!Core::get('refactor') && $userRectorConfig) {
             $this->writeln("<comment>Using your existing $userRectorConfig (alchemy.yml has no refactor section)...</comment>\n");
             $refactorConfigPath = getcwd() . '/' . $userRectorConfig;
         } else {
@@ -339,9 +378,12 @@ class SetupCommand extends Command
             $this->writeln('<info>PHPStan installed successfully!</info>');
         }
 
-        // a project with its own phpstan config and no analyse section
-        // runs on its own setup, baseline and all
-        if (!Core::get('analyse') && $userPhpstanConfig) {
+        // a pinned config file or a project with its own phpstan config and
+        // no analyse section runs on its own setup, baseline and all
+        if ($pinned = $this->pinnedConfig('analyse')) {
+            $this->writeln("<comment>Using your existing $pinned...</comment>\n");
+            $analyseConfigPath = getcwd() . '/' . $pinned;
+        } elseif (!Core::get('analyse') && $userPhpstanConfig) {
             $this->writeln("<comment>Using your existing $userPhpstanConfig (alchemy.yml has no analyse section)...</comment>\n");
             $analyseConfigPath = getcwd() . '/' . $userPhpstanConfig;
         } else {
@@ -381,9 +423,10 @@ class SetupCommand extends Command
 
         $check = $this->checkMode();
 
-        // a project with its own fixer config and no lint section keeps its setup untouched
-        if ($userConfig = $this->userEngineConfig('lint')) {
-            $this->writeln("<comment>Using your existing $userConfig (alchemy.yml has no lint section)...</comment>\n");
+        // a pinned config file or a project with its own fixer config and no
+        // lint section keeps its setup untouched
+        if ($userConfig = ($this->pinnedConfig('lint') ?? $this->userEngineConfig('lint'))) {
+            $this->writeln("<comment>Using your existing $userConfig...</comment>\n");
 
             $lintProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : ''))
@@ -404,7 +447,8 @@ class SetupCommand extends Command
 
         Core::generateLintFiles();
 
-        $risky = (Core::get('lint')['risky'] ?? true) ? ' --allow-risky=yes' : '';
+        $lintConfig = is_array(Core::get('lint')) ? Core::get('lint') : [];
+        $risky = ($lintConfig['risky'] ?? true) ? ' --allow-risky=yes' : '';
         $lintFlags = $risky . ($check ? ' --dry-run --diff' : '');
 
         $this->writeln($check ? "<comment>Checking code style...</comment>\n" : "<comment>Running linter...</comment>\n");
@@ -424,6 +468,24 @@ class SetupCommand extends Command
         }
 
         return 0;
+    }
+
+    protected const CI_MARKER = "# Generated by Leaf Alchemy from alchemy.yml — edits will be overwritten on the next alchemy run.\n# Remove this header to take ownership of this file.";
+
+    /**
+     * A CI file is alchemy's to regenerate if it doesn't exist yet or still
+     * carries a generated-by header; without one it belongs to the user
+     */
+    protected function ciFileIsAlchemyOwned(string $file): bool
+    {
+        if (!file_exists($file)) {
+            return true;
+        }
+
+        $contents = \Leaf\FS\File::read($file);
+
+        return strpos($contents, '# Generated by Leaf Alchemy') === 0
+            || strpos($contents, '# Generated by Alchemy') === 0;
     }
 
     protected function generateActions()
@@ -463,10 +525,10 @@ class SetupCommand extends Command
             $os = $config['os'] ?? ['ubuntu-latest'];
             $events = $config['events'] ?? $config['event'] ?? ['push'];
             $failFast = $config['fail-fast'] ?? true;
-            $lintAutofix = Core::get('lint')['autofix'] ?? false;
+            $lintAutofix = is_array(Core::get('lint')) ? (Core::get('lint')['autofix'] ?? false) : false;
 
             $actionsToWrite = [];
-            $database = Core::get('tests')['database'] ?? false;
+            $database = is_array(Core::get('tests')) ? (Core::get('tests')['database'] ?? false) : false;
             $actionsCoverage = ($config['tests']['coverage']['actions'] ?? true) ? 'xdebug' : 'none';
             $coverageFlags = $actionsCoverage !== 'none' ? ' -- --flags=coverage' : '';
 
@@ -489,7 +551,7 @@ class SetupCommand extends Command
                 } elseif ($database['type'] === 'pgsql') {
                     $actionsToWrite[] = "\n
       - name: Initialize Database
-        uses: ikalnytskyi/action-setup-postgres@v6
+        uses: ikalnytskyi/action-setup-postgres@v8
         with:
           username: $dbUser
           password: $dbPassword
@@ -500,7 +562,9 @@ class SetupCommand extends Command
                 }
             }
 
-            if (!file_exists($actionFile)) {
+            // regenerate alchemy-owned workflows so action pins and stub fixes
+            // propagate; a file without the marker header belongs to the user
+            if ($this->ciFileIsAlchemyOwned($actionFile)) {
                 $this->writeln("<info>Writing GitHub action $action.yml...</info>");
 
                 $actionStub = \Leaf\FS\File::read(dirname(__DIR__) . "/setup/workflows/$action.yml");
@@ -508,7 +572,7 @@ class SetupCommand extends Command
                 $lintRun = $lintAutofix ? 'composer run fmt' : 'composer run lint -- --check';
                 $lintSteps = $lintAutofix ? "\n
       - name: Commit style fixes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'chore: fix styling'" : '';
 
@@ -531,8 +595,8 @@ class SetupCommand extends Command
     {
         $ciFile = getcwd() . '/.gitlab-ci.yml';
 
-        if (file_exists($ciFile)) {
-            $this->writeln('<comment>.gitlab-ci.yml already exists, skipping.</comment>');
+        if (!$this->ciFileIsAlchemyOwned($ciFile)) {
+            $this->writeln('<comment>.gitlab-ci.yml is user-managed, skipping.</comment>');
             return 0;
         }
 
@@ -543,7 +607,7 @@ class SetupCommand extends Command
 
         $this->writeln('<info>Writing .gitlab-ci.yml...</info>');
 
-        $yml = "# Generated by Alchemy\n\n";
+        $yml = static::CI_MARKER . "\n\n";
 
         if (in_array('pull_request', $events) && !in_array('push', $events)) {
             $yml .= "workflow:\n  rules:\n    - if: \$CI_PIPELINE_SOURCE == 'merge_request_event'\n\n";
@@ -582,8 +646,8 @@ class SetupCommand extends Command
     {
         $ciFile = getcwd() . '/.circleci/config.yml';
 
-        if (file_exists($ciFile)) {
-            $this->writeln('<comment>.circleci/config.yml already exists, skipping.</comment>');
+        if (!$this->ciFileIsAlchemyOwned($ciFile)) {
+            $this->writeln('<comment>.circleci/config.yml is user-managed, skipping.</comment>');
             return 0;
         }
 
@@ -593,7 +657,7 @@ class SetupCommand extends Command
 
         $this->writeln('<info>Writing .circleci/config.yml...</info>');
 
-        $yml = "# Generated by Alchemy\nversion: 2.1\n\njobs:\n";
+        $yml = static::CI_MARKER . "\nversion: 2.1\n\njobs:\n";
         $workflowJobs = '';
 
         foreach ($jobs as $job) {

@@ -19,10 +19,31 @@ lint:
     not_operator_with_successor_space: false
     single_quote: true
 
+analyse:
+  level: 5
+  paths:
+    - src
+  baseline: phpstan-baseline.neon
+  includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+  treatPhpDocTypesAsCertain: false
+
+refactor:
+  php: '8.3'
+  sets:
+    - dead-code
+    - code-quality
+  fluent-new-line: true
+  import-names: true
+
 actions:
+  # provider can also be gitlab, circleci, or a list of several
+  provider: github
   run:
     - lint
     - tests
+    # - analyse
+    # - refactor
   os:
     - ubuntu-latest
   php:

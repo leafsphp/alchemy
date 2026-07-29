@@ -124,7 +124,7 @@ refactor:
     - src/legacy
 ```
 
-Rector only joins the full `alchemy setup` pipeline when a `refactor` section exists — a tool that rewrites your code should be opted into.
+A tool that rewrites your code should be opted into: rector only runs when a `refactor` section exists in your `alchemy.yml` (`refactor` supports `paths`, `downgrade`, `fluent-new-line` and `import-names` too — everything a typical `rector.php` expresses).
 
 Alchemy can generate CI for more than GitHub Actions. Set one or more providers under `actions.provider` and the same yml projects onto each — `.github/workflows/*.yml`, `.gitlab-ci.yml` (with a PHP version matrix and composer caching), or `.circleci/config.yml`:
 
@@ -151,31 +151,45 @@ analyse:
     - '#some error pattern to ignore#'
 ```
 
+A `phpstan-baseline.neon` at your project root is included automatically, and **any other key under `analyse` is passed through to phpstan verbatim** — `includes`, `excludePaths`, `treatPhpDocTypesAsCertain`, anything — so the section is never less expressive than a hand-written neon file.
+
 ## ⚗️ Commands
 
 | Command | What it does |
 | --- | --- |
-| `alchemy init` | Create alchemy.yml — detects your framework and **imports an existing phpunit.xml / php-cs-fixer config** |
+| `alchemy init` | Create alchemy.yml — detects your framework and asks whether to **port existing tool configs** (phpunit.xml, php-cs-fixer, phpstan neon, rector.php) or keep them (`--port` / `--keep` to answer for every tool without prompts) |
 | `alchemy test` | Run your tests (installs your engine on first run) |
 | `alchemy lint` | Check code style — reports violations, changes nothing |
 | `alchemy fmt` | Fix code style |
 | `alchemy refactor` | Apply Rector refactors (`--check` in CI) |
 | `alchemy analyse` | Run PHPStan static analysis |
 | `alchemy ci` | Generate CI pipelines for your configured providers |
+| `alchemy all` | Run **everything present in alchemy.yml** — tests, lint, refactor, analyse, CI generation. Sections that aren't in the file don't run |
 | `alchemy switch <target>` | Switch CI provider (github/gitlab/circleci) or test engine (pest/phpunit) — everything regenerates from the same yml |
 | `alchemy eject` | Leave alchemy: export real config files, no lock-in |
 
-Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine.
+(`alchemy setup` is a deprecated alias for `alchemy all`.)
 
-Alchemy also respects existing setups — commands only touch files in their own scope. If your `alchemy.yml` doesn't configure a tool but your project has its own config for it (a hand-written `.php-cs-fixer.dist.php` or `phpunit.xml`), alchemy runs the tool with **your** config untouched — you're never migrated unless you ask (`alchemy init`). And `alchemy eject` exports real config files if you ever want to leave.
+Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine — pest arrives on your first `composer run test`, phpstan on your first `composer run analyse`, never before.
 
-Once you're done setting up your `alchemy.yml` file, you can run the setup script.
+Alchemy also never takes over a setup you didn't hand it. When `init` finds an existing tool config it asks: **port it** into `alchemy.yml` (phpunit.xml and php-cs-fixer configs map fully; phpstan neon files port through the `analyse` passthrough; `rector.php` is read directly from the rector config itself) — or **keep it**, recorded in `alchemy.yml` as a pinned file:
 
-```bash
-leaf run alchemy # or composer run alchemy
+```yaml
+tests: phpunit.xml # a string section = "run this tool from my file, as-is"
+analyse: phpstan.dist.neon
 ```
 
-This will install your test engine, PHP CS Fixer and any other dependencies you might need, and then generate dummy tests using the test engine you chose. It will then lint your code, run your tests and generate a coverage report (if you selected that option). It will also add a `test` and `lint` command to your `composer.json` file which you can use to run your tests and lint your code respectively. Finally, it will generate a `.github/workflows` directory with a `test.yml` file and a `lint.yml` file which you can use to run your tests and linting on github actions.
+A map section is alchemy-managed (config generated into `.alchemy/`, root never touched); a string section runs the engine against your file verbatim. Either way the decision lives in `alchemy.yml`, so CI and teammates get the same behavior. As a safety net, a tool with no section at all but an existing config file in the project still runs on that file. And `alchemy eject` exports real config files if you ever want to leave.
+
+The typical workflow, fresh or existing project:
+
+```bash
+leaf install alchemy   # or composer require leafs/alchemy --dev
+./vendor/bin/alchemy init
+composer run test      # or lint / fmt / analyse / refactor / ci
+```
+
+`composer run alchemy` maps to `alchemy all` for when you want the whole pipeline locally before pushing.
 
 Based on your engine, you might see either of the outputs below
 

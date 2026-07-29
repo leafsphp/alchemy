@@ -31,8 +31,8 @@ class Core
 
     public static function unJsonify($data, $pretty = JSON_PRETTY_PRINT)
     {
-        $parsed = str_replace(['{', '}', '\/', ':', '"__DIR__"'], ['[', ']', '/', ' =>', '__DIR__'], json_encode($data, $pretty));
-        return preg_replace('/"__DIR__\s*\.\s*\'(.*?)\'"/', '__DIR__ . \'$1\'', $parsed);
+        $parsed = str_replace(['{', '}', '\/', ':', '"__DIR__"', '"dirname(__DIR__)"'], ['[', ']', '/', ' =>', '__DIR__', 'dirname(__DIR__)'], json_encode($data, $pretty));
+        return preg_replace('/"((?:dirname\(__DIR__\)|__DIR__)\s*\.\s*)\'(.*?)\'"/', '$1\'$2\'', $parsed);
     }
 
     public static function generateTestFiles(bool $ejected = false)
@@ -234,7 +234,7 @@ class Core
         $composerConfigPlugins = $composerConfig['allow-plugins'] ?? [];
 
         // @php keeps the scripts working on Windows too
-        $appComposerJson['scripts']['alchemy'] = '@php vendor/bin/alchemy setup';
+        $appComposerJson['scripts']['alchemy'] = '@php vendor/bin/alchemy all';
         $appComposerJson['scripts']['test'] = '@php vendor/bin/alchemy test';
         $appComposerJson['scripts']['lint'] = '@php vendor/bin/alchemy lint';
         $appComposerJson['scripts']['fmt'] = '@php vendor/bin/alchemy fmt';

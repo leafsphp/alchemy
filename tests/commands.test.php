@@ -66,17 +66,96 @@ test('init imports an existing phpunit.xml into alchemy.yml', function () {
 </phpunit>
 XML);
 
-    [$exit, $output] = alchemy('init');
+    [$exit, $output] = alchemy('init --port');
     $yml = file_get_contents(getcwd() . '/alchemy.yml');
 
     expect($exit)->toBe(0)
-        ->and($output)->toContain('Imported existing phpunit.xml')
+        ->and($output)->toContain('Imported phpunit.xml')
         ->and($output)->toContain('Laravel')
         ->and($yml)->toContain('Unit:')
         ->and($yml)->toContain("- '*Test.php'")
         ->and($yml)->toContain('APP_ENV: testing')
         ->and($yml)->toContain('stopOnFailure: true');
 });
+
+test('init records use-as-is choices as pinned string sections', function () {
+    writeComposerJson();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/phpunit.xml', "<?xml version=\"1.0\"?>\n<phpunit></phpunit>\n");
+    file_put_contents(getcwd() . '/phpstan.dist.neon', "parameters:\n    level: 8\n");
+    file_put_contents(getcwd() . '/rector.php', "<?php\nreturn true;\n");
+
+    [$exit, $output] = alchemy('init --keep');
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($exit)->toBe(0)
+        ->and($yml)->toContain('tests: phpunit.xml')
+        ->and($yml)->toContain('analyse: phpstan.dist.neon')
+        ->and($yml)->toContain('refactor: rector.php');
+});
+
+test('init --port turns a phpstan neon into an analyse section', function () {
+    writeComposerJson();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/phpstan.dist.neon', <<<'NEON'
+includes:
+	- vendor/phpstan/phpstan/conf/bleedingEdge.neon
+	- phpstan-baseline.neon
+
+parameters:
+	level: 8
+	paths:
+		- src
+	treatPhpDocTypesAsCertain: false
+NEON);
+
+    [$exit, $output] = alchemy('init --port');
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Imported phpstan.dist.neon')
+        ->and($yml)->toContain('level: 8')
+        ->and($yml)->toContain('baseline: phpstan-baseline.neon')
+        ->and($yml)->toContain('- vendor/phpstan/phpstan/conf/bleedingEdge.neon')
+        ->and($yml)->toContain('treatPhpDocTypesAsCertain: false');
+});
+
+test('tests run from a pinned phpunit.xml string section', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/tests');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\ntests: phpunit.xml\n");
+    file_put_contents(getcwd() . '/phpunit.xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" colors="true">
+    <testsuites>
+        <testsuite name="Pinned"><directory suffix="MyTest.php">tests</directory></testsuite>
+    </testsuites>
+</phpunit>
+XML);
+    file_put_contents(getcwd() . '/tests/ExampleMyTest.php', "<?php\n\ntest('runs from the pinned config', function () {\n    expect(true)->toBeTrue();\n});\n");
+
+    [$exit, $output] = alchemy('test');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Using your existing phpunit.xml')
+        ->and($output)->toContain('runs from the pinned config');
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('all runs exactly the sections present in alchemy.yml', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/src/Fine.php', "<?php\n\n\$x = 'single';\n");
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\nlint:\n  preset: PSR12\n");
+
+    [$exit, $output] = alchemy('all');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Running linter')
+        ->and($output)->not->toContain('Using pest')
+        ->and($output)->toContain('Everything in alchemy.yml ran clean');
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
 test('ci generates pipelines for every configured provider', function () {
     writeComposerJson();

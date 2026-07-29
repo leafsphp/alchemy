@@ -9,7 +9,9 @@ use Symfony\Component\Yaml\Yaml;
 class InitCommand extends Command
 {
     protected $signature = 'init
-        {--f|force? : Overwrite an existing alchemy.yml}';
+        {--f|force? : Overwrite an existing alchemy.yml}
+        {--p|port? : Port existing tool configs into alchemy.yml without asking}
+        {--k|keep? : Keep existing tool configs as-is without asking}';
     protected $description = 'Set up alchemy: detect your framework and import existing phpunit/php-cs-fixer config';
     protected $help = 'Creates an alchemy.yml for your project. Detects your framework from composer.json, imports an existing phpunit.xml and php-cs-fixer config if found, and wires up composer scripts.';
 
@@ -36,17 +38,25 @@ class InitCommand extends Command
             ],
         ];
 
-        if ($imported = $this->importPhpunitXml($config)) {
-            $config = $imported;
-            $this->writeln('<info>Imported existing phpunit.xml into alchemy.yml.</info>');
-        }
+        // existing tool configs: ask port-or-keep, and record the choice in
+        // alchemy.yml — a string value pins the tool to that file as-is
+        $config = $this->resolveExistingConfig($config, 'tests', ['phpunit.xml', 'phpunit.xml.dist'], function ($cfg) {
+            return $this->importPhpunitXml($cfg);
+        });
 
-        if ($imported = $this->importCsFixerConfig($config)) {
-            $config = $imported;
-            $this->writeln('<info>Imported existing php-cs-fixer config into alchemy.yml.</info>');
-        }
+        $config = $this->resolveExistingConfig($config, 'lint', ['.php-cs-fixer.dist.php', '.php-cs-fixer.php'], function ($cfg) {
+            return $this->importCsFixerConfig($cfg);
+        });
 
-        \Leaf\FS\File::create($configFile, Yaml::dump($config, 6, 2), ['overwrite' => true]);
+        $config = $this->resolveExistingConfig($config, 'analyse', ['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'], function ($cfg, $file) {
+            return $this->importPhpstanConfig($cfg, $file);
+        });
+
+        $config = $this->resolveExistingConfig($config, 'refactor', ['rector.php', 'rector.dist.php'], function ($cfg, $file) {
+            return $this->importRectorConfig($cfg, $file);
+        });
+
+        \Leaf\FS\File::create($configFile, Yaml::dump($config, 6, 2) . $this->optionalSectionsHint($config), ['overwrite' => true]);
 
         Core::installComposerScripts();
         Core::updateGitIgnore();
@@ -55,6 +65,95 @@ class InitCommand extends Command
         $this->writeln('<comment>Run `composer run test`, `composer run lint`, or `composer run alchemy` to get started.</comment>');
 
         return 0;
+    }
+
+    /**
+     * A tool config file already exists: ask whether to port it into
+     * alchemy.yml or keep using the file as-is. The answer is recorded —
+     * a ported section is a map, a kept file is pinned as a string value.
+     * Falls back to pinning when the import can't represent the file.
+     */
+    protected function resolveExistingConfig(array $config, string $tool, array $candidates, callable $import): array
+    {
+        $file = null;
+
+        foreach ($candidates as $candidate) {
+            if (file_exists(getcwd() . "/$candidate")) {
+                $file = $candidate;
+                break;
+            }
+        }
+
+        if (!$file) {
+            return $config;
+        }
+
+        $port = $this->option('port') ? true : ($this->option('keep') ? false : null);
+
+        if ($port === null && !$this->isInteractive()) {
+            $this->writeln("<comment>Found $file — keeping it as-is (`$tool: $file`). Re-run `alchemy init` interactively or with --port to port it.</comment>");
+            $config[$tool] = $file;
+            return $config;
+        }
+
+        if ($port === false || ($port === null && !sprout()->confirm("Found $file — port it into alchemy.yml? (\"no\" keeps running $tool from $file)", true))) {
+            $config[$tool] = $file;
+            return $config;
+        }
+
+        if ($imported = $import($config, $file)) {
+            $this->writeln("<info>Imported $file into alchemy.yml — you can delete $file now.</info>");
+            return $imported;
+        }
+
+        $this->writeln("<comment>Couldn't fully port $file — keeping it as-is (`$tool: $file`).</comment>");
+        $config[$tool] = $file;
+
+        return $config;
+    }
+
+    protected function isInteractive(): bool
+    {
+        return defined('STDIN') && function_exists('stream_isatty') && @stream_isatty(STDIN);
+    }
+
+    /**
+     * Commented examples of the optional sections, appended to a fresh
+     * alchemy.yml so the full feature set is discoverable
+     */
+    protected function optionalSectionsHint(array $config = []): string
+    {
+        $hints = '';
+
+        if (!isset($config['analyse'])) {
+            $hints .= <<<'YML'
+
+# static analysis with phpstan — uncomment to enable
+# (set to a filename, e.g. `analyse: phpstan.neon`, to run from your own config;
+# any other key here is passed through to phpstan verbatim)
+# analyse:
+#   level: 5
+#   baseline: phpstan-baseline.neon
+
+YML;
+        }
+
+        if (!isset($config['refactor'])) {
+            $hints .= <<<'YML'
+
+# automated refactoring with rector — uncomment to enable
+# (set to a filename, e.g. `refactor: rector.php`, to run from your own config)
+# refactor:
+#   php: '8.3'
+#   sets:
+#     - dead-code
+#     - code-quality
+#   import-names: true
+
+YML;
+        }
+
+        return $hints;
     }
 
     protected function detectFramework(): string
@@ -249,6 +348,143 @@ class InitCommand extends Command
         }
 
         $config['lint']['risky'] = $fixerConfig->getRiskyAllowed();
+
+        return $config;
+    }
+
+    /**
+     * Port a phpstan neon config into an analyse section. Neon is yaml-shaped
+     * (tabs aside), and unknown analyse keys pass through to phpstan verbatim,
+     * so most files map 1:1. Returns null when the file can't be parsed.
+     */
+    protected function importPhpstanConfig(array $config, string $file): ?array
+    {
+        try {
+            // neon allows tabs for indentation, yaml doesn't
+            $parsed = Yaml::parse(str_replace("\t", '    ', (string) file_get_contents(getcwd() . "/$file")));
+        } catch (\Throwable $exception) {
+            $this->writeln('<comment>Could not parse ' . $file . ' as yaml-compatible neon. (' . $exception->getMessage() . ')</comment>');
+            return null;
+        }
+
+        if (!is_array($parsed)) {
+            return null;
+        }
+
+        $analyse = $parsed['parameters'] ?? [];
+
+        // includes: the baseline gets its own key, the rest carry over
+        foreach ((array) ($parsed['includes'] ?? []) as $include) {
+            if (strpos(basename($include), 'baseline') !== false) {
+                $analyse['baseline'] = $include;
+            } else {
+                $analyse['includes'][] = $include;
+            }
+        }
+
+        // anything outside includes/parameters (services, rules, extensions)
+        // is phpstan-extension territory alchemy can't own
+        if (array_diff_key($parsed, array_flip(['includes', 'parameters']))) {
+            $this->writeln("<comment>$file has sections beyond includes/parameters.</comment>");
+            return null;
+        }
+
+        $config['analyse'] = $analyse ?: ['level' => 5];
+
+        return $config;
+    }
+
+    /**
+     * Port a rector.php into a refactor section by loading the config and
+     * reading the builder's settings. Best-effort: anything that doesn't map
+     * to refactor keys returns null so the file gets pinned instead.
+     */
+    protected function importRectorConfig(array $config, string $file): ?array
+    {
+        if (!class_exists(\Rector\Config\RectorConfig::class) && file_exists(getcwd() . '/vendor/autoload.php')) {
+            require_once getcwd() . '/vendor/autoload.php';
+        }
+
+        if (!class_exists(\Rector\Config\RectorConfig::class)) {
+            $this->writeln('<comment>Rector isn\'t installed, so ' . $file . ' can\'t be read.</comment>');
+            return null;
+        }
+
+        try {
+            $builder = require getcwd() . "/$file";
+
+            if (!$builder instanceof \Rector\Configuration\RectorConfigBuilder) {
+                return null;
+            }
+
+            $settings = [];
+
+            foreach ((new \ReflectionObject($builder))->getProperties() as $property) {
+                $property->setAccessible(true);
+                $settings[$property->getName()] = $property->getValue($builder);
+            }
+        } catch (\Throwable $exception) {
+            $this->writeln('<comment>Could not load ' . $file . '. (' . $exception->getMessage() . ')</comment>');
+            return null;
+        }
+
+        $refactor = [];
+        $root = getcwd() . '/';
+
+        foreach ((array) ($settings['paths'] ?? []) as $path) {
+            $refactor['paths'][] = strpos($path, $root) === 0 ? substr($path, strlen($root)) : $path;
+        }
+
+        // sets are file paths into rector's config/set tree; map the ones
+        // alchemy speaks and bail on anything else
+        $knownSets = ['dead-code', 'code-quality', 'coding-style', 'type-declarations', 'privatization', 'naming', 'instanceof', 'early-return', 'strict-booleans'];
+
+        foreach ((array) ($settings['sets'] ?? []) as $set) {
+            $setName = basename((string) $set, '.php');
+
+            if (in_array($setName, $knownSets)) {
+                $refactor['sets'][] = $setName;
+            } elseif (preg_match('/^(?:php|up-to-php)(\d)(\d+)$/', $setName, $phpSet)) {
+                $refactor['php'] = "$phpSet[1].$phpSet[2]";
+            } elseif (preg_match('/^(?:downgrade-php|down-to-php)(\d)(\d+)$/', $setName, $downgradeSet)) {
+                $refactor['downgrade'] = "$downgradeSet[1].$downgradeSet[2]";
+            } else {
+                $this->writeln("<comment>$file uses a set alchemy can't express ($setName).</comment>");
+                return null;
+            }
+        }
+
+        // php sets registered via withPhpSets rather than explicit set files
+        if (!isset($refactor['php']) && !empty($settings['isWithPhpSetsUsed'])) {
+            $refactor['php'] = true;
+        }
+
+        foreach ((array) ($settings['skip'] ?? []) as $skip) {
+            $refactor['skip'][] = is_string($skip) && strpos($skip, $root) === 0 ? substr($skip, strlen($root)) : $skip;
+        }
+
+        foreach ((array) ($settings['rules'] ?? []) as $rule) {
+            $refactor['rules'][] = $rule;
+        }
+
+        if (!empty($settings['isFluentNewLine']) || !empty($settings['fluentCallNewLine'])) {
+            $refactor['fluent-new-line'] = true;
+        }
+
+        if (!empty($settings['importNames']) || !empty($settings['removeUnusedImports'])) {
+            $refactor['import-names'] = [
+                'import' => (bool) ($settings['importNames'] ?? false),
+                'doc-blocks' => (bool) ($settings['importDocBlockNames'] ?? false),
+                'short-classes' => (bool) ($settings['importShortClasses'] ?? false),
+                'remove-unused' => (bool) ($settings['removeUnusedImports'] ?? false),
+            ];
+
+            if (!in_array(false, $refactor['import-names'], true)) {
+                $refactor['import-names'] = true;
+            }
+        }
+
+        $config['refactor'] = $refactor ?: ['php' => true];
 
         return $config;
     }
