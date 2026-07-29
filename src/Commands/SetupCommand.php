@@ -239,6 +239,13 @@ class SetupCommand extends Command
 
         $binary = $engine;
         $flags = $engine === 'pest' ? '--colors=always' : '';
+
+        // standing engine flags from alchemy.yml — any pest/phpunit option
+        // works here (tia, shard=1/4, type-coverage, ...)
+        foreach ((array) ($config['flags'] ?? []) as $engineFlag) {
+            $flags .= ' --' . ltrim((string) $engineFlag, '-');
+        }
+
         $flags .= $this->option('flags')
             ? (' --' . implode(' --', explode(',', $this->option('flags'))))
             : '';
@@ -392,6 +399,7 @@ class SetupCommand extends Command
             $this->writeln("<comment>Using your existing $userPhpstanConfig (alchemy.yml has no analyse section)...</comment>\n");
             $analyseConfigPath = getcwd() . '/' . $userPhpstanConfig;
         } else {
+            $this->ensurePestPhpstanPlugin();
             Core::generateAnalyseFiles();
             $analyseConfigPath = getcwd() . '/.alchemy/.phpstan.dist.neon';
         }
@@ -411,6 +419,42 @@ class SetupCommand extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * A pest project analysing its own tests needs phpstan taught pest's DSL
+     * (it(), expect(), $this binding) — pest 5 ships a first-party plugin
+     */
+    protected function ensurePestPhpstanPlugin()
+    {
+        if (!file_exists(getcwd() . '/vendor/bin/pest') || is_dir(getcwd() . '/vendor/pestphp/pest-plugin-phpstan')) {
+            return;
+        }
+
+        $analyseConfig = is_array(Core::get('analyse')) ? Core::get('analyse') : [];
+        $testsConfig = is_array(Core::get('tests')) ? Core::get('tests') : [];
+
+        $analysedPaths = (array) ($analyseConfig['paths'] ?? Core::get('app') ?? []);
+        $testPaths = (array) ($testsConfig['paths'] ?? ['tests']);
+        $coversTests = false;
+
+        foreach ($analysedPaths as $analysedPath) {
+            foreach ($testPaths as $testPath) {
+                if ($analysedPath === $testPath || strpos("$testPath/", "$analysedPath/") === 0 || strpos("$analysedPath/", "$testPath/") === 0) {
+                    $coversTests = true;
+                }
+            }
+        }
+
+        if (!$coversTests) {
+            return;
+        }
+
+        $this->writeln("<info>Your analyse paths cover your tests — adding pest's phpstan plugin so phpstan understands pest syntax...</info>\n");
+
+        if (!sprout()->composer()->install('pestphp/pest-plugin-phpstan --dev')->isSuccessful()) {
+            $this->writeln("<comment>Couldn't install pestphp/pest-plugin-phpstan (it needs Pest 5 on PHP 8.4). Continuing without it.</comment>\n");
+        }
     }
 
     protected function runLinter()

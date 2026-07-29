@@ -437,7 +437,7 @@ YML;
 
         // sets are file paths into rector's config/set tree; map the ones
         // alchemy speaks and bail on anything else
-        $knownSets = ['dead-code', 'code-quality', 'coding-style', 'type-declarations', 'privatization', 'naming', 'instanceof', 'early-return', 'strict-booleans'];
+        $knownSets = array_keys(Core::REFACTOR_SETS);
 
         foreach ((array) ($settings['sets'] ?? []) as $set) {
             $setName = basename((string) $set, '.php');

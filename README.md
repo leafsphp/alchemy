@@ -45,7 +45,8 @@ tests:
   files:
     - '*.test.php'
   coverage:
-    processUncoveredFiles: true
+    local: false # coverage on demand locally...
+    actions: true # ...always on CI
 
 lint:
   preset: 'PSR12'
@@ -63,7 +64,7 @@ lint:
 actions:
   run:
     - 'lint'
-    - 'test'
+    - 'tests'
   php:
     extensions: json, zip
     versions:
@@ -103,6 +104,8 @@ tests:
   coverage:
     exclude:
       - src/legacy
+  flags: # standing engine flags — any pest/phpunit option (pest 5: tia, shard=1/4, ...)
+    - tia
 
 lint:
   preset: PSR12
@@ -116,10 +119,11 @@ Alchemy can also manage [Rector](https://getrector.com) for automated refactorin
 ```yaml
 refactor:
   php: '8.2' # upgrade sets targeting this PHP version (true = read from composer.json)
-  sets: # rector's prepared sets
+  sets: # any of rector 2's twenty prepared sets, kebab-cased
     - dead-code
     - code-quality
     - type-declarations
+    - phpunit-code-quality
   skip:
     - src/legacy
 ```
@@ -151,7 +155,7 @@ analyse:
     - '#some error pattern to ignore#'
 ```
 
-A `phpstan-baseline.neon` at your project root is included automatically, and **any other key under `analyse` is passed through to phpstan verbatim** — `includes`, `excludePaths`, `treatPhpDocTypesAsCertain`, anything — so the section is never less expressive than a hand-written neon file.
+A `phpstan-baseline.neon` at your project root is included automatically, and **any other key under `analyse` is passed through to phpstan verbatim** — `includes`, `excludePaths`, `treatPhpDocTypesAsCertain`, anything — so the section is never less expressive than a hand-written neon file. Pest projects whose analyse paths cover their tests also get Pest's first-party phpstan plugin installed and wired in automatically (Pest 5 on PHP 8.4), so pest syntax analyses without false positives.
 
 ## ⚗️ Commands
 

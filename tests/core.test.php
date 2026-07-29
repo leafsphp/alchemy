@@ -157,6 +157,8 @@ test('rector config renders downgrade, fluent new line, import names and custom 
         ->toContain('->withFluentCallNewLine()')
         ->toContain('->withImportNames(importNames: true, importDocBlockNames: true, importShortClasses: true, removeUnusedImports: true)')
         ->toContain("dirname(__DIR__) . '/src', dirname(__DIR__) . '/tests'");
+
+    expect(array_keys(Core::REFACTOR_SETS))->toContain('phpunit-code-quality', 'rector-preset', 'symfony-code-quality', 'named-args', 'carbon');
 });
 
 test('phpstan config renders level, paths and ignores', function () {
@@ -173,6 +175,24 @@ test('phpstan config renders level, paths and ignores', function () {
         ->toContain('- ' . getcwd() . "/lib\n")
         ->toContain("- '#unknown method#'")
         ->toContain('tmpDir: ' . getcwd() . '/.alchemy/phpstan');
+});
+
+test('phpstan config includes the pest plugin when installed without extension-installer', function () {
+    mkdir(getcwd() . '/vendor/pestphp/pest-plugin-phpstan', 0777, true);
+    file_put_contents(getcwd() . '/vendor/pestphp/pest-plugin-phpstan/extension.neon', "services: []\n");
+
+    Core::set(['app' => ['src'], 'analyse' => ['level' => 5]]);
+    Core::generateAnalyseFiles();
+
+    expect(file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon'))
+        ->toContain('- ' . getcwd() . "/vendor/pestphp/pest-plugin-phpstan/extension.neon\n");
+
+    // extension-installer wires the plugin itself — no manual include then
+    mkdir(getcwd() . '/vendor/phpstan/extension-installer', 0777, true);
+    Core::generateAnalyseFiles();
+
+    expect(file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon'))
+        ->not->toContain('pest-plugin-phpstan');
 });
 
 test('phpstan config passes unknown analyse keys through as parameters', function () {

@@ -142,6 +142,19 @@ XML);
         ->and($output)->toContain('runs from the pinned config');
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
+test('standing tests.flags reach the engine invocation', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/tests');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\ntests:\n  engine: pest\n  flags:\n    - stop-on-failure\n");
+    file_put_contents(getcwd() . '/tests/flag.test.php', "<?php\n\ntest('flag run works', function () {\n    expect(true)->toBeTrue();\n});\n");
+
+    [$exit, $output] = alchemy('test');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('flag run works');
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
 test('all runs exactly the sections present in alchemy.yml', function () {
     writeComposerJson();
     linkVendor();

@@ -10,6 +10,32 @@ class Core
     protected static $config = [];
 
     /**
+     * Rector's prepared sets (rector 2.x), kebab-cased for alchemy.yml
+     */
+    public const REFACTOR_SETS = [
+        'dead-code' => 'deadCode',
+        'code-quality' => 'codeQuality',
+        'coding-style' => 'codingStyle',
+        'type-declarations' => 'typeDeclarations',
+        'type-declaration-docblocks' => 'typeDeclarationDocblocks',
+        'privatization' => 'privatization',
+        'naming' => 'naming',
+        'named-args' => 'namedArgs',
+        'instanceof' => 'instanceOf',
+        'if' => 'if',
+        'early-return' => 'earlyReturn',
+        'strict-booleans' => 'strictBooleans',
+        'carbon' => 'carbon',
+        'rector-preset' => 'rectorPreset',
+        'phpunit-code-quality' => 'phpunitCodeQuality',
+        'phpunit-narrow-asserts' => 'phpunitNarrowAsserts',
+        'phpunit-mock-to-stub' => 'phpunitMockToStub',
+        'doctrine-code-quality' => 'doctrineCodeQuality',
+        'symfony-code-quality' => 'symfonyCodeQuality',
+        'symfony-configs' => 'symfonyConfigs',
+    ];
+
+    /**
      * Set Alchemy config
      */
     public static function set($config)
@@ -290,6 +316,14 @@ class Core
             $includes[] = strpos($include, '/') === 0 ? $include : "$root/$include";
         }
 
+        // pest's phpstan plugin teaches the analyser pest's DSL — include it
+        // when installed (extension-installer users get it wired automatically)
+        $pestPluginNeon = "$root/vendor/pestphp/pest-plugin-phpstan/extension.neon";
+
+        if (file_exists($pestPluginNeon) && !is_dir("$root/vendor/phpstan/extension-installer")) {
+            $includes[] = $pestPluginNeon;
+        }
+
         // the baseline may also be listed explicitly under `includes`
         $includes = array_unique($includes);
 
@@ -430,18 +464,7 @@ class Core
                 . ')';
         }
 
-        // rector's prepared sets, kebab-cased in yml
-        $setMap = [
-            'dead-code' => 'deadCode',
-            'code-quality' => 'codeQuality',
-            'coding-style' => 'codingStyle',
-            'type-declarations' => 'typeDeclarations',
-            'privatization' => 'privatization',
-            'naming' => 'naming',
-            'instanceof' => 'instanceOf',
-            'early-return' => 'earlyReturn',
-            'strict-booleans' => 'strictBooleans',
-        ];
+        $setMap = static::REFACTOR_SETS;
         $preparedSets = [];
 
         foreach ((array) ($refactorConfig['sets'] ?? []) as $set) {
