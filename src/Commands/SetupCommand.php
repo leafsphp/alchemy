@@ -48,6 +48,11 @@ class SetupCommand extends Command
         if (!$this->option('test') && !$this->option('lint') && !$this->option('refactor') && !$this->option('actions')) {
             $this->writeln("<comment>`alchemy setup` is deprecated — use `alchemy all` to run everything in alchemy.yml.</comment>\n");
 
+            if (!file_exists(getcwd() . '/alchemy.yml')) {
+                $this->writeln('<comment>No alchemy.yml found. Run `alchemy init` first — `alchemy all` runs what your file configures.</comment>');
+                return 1;
+            }
+
             return $this->runAll();
         }
 

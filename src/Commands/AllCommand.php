@@ -12,6 +12,11 @@ class AllCommand extends SetupCommand
 
     protected function handle(): int
     {
+        if (!file_exists(getcwd() . '/alchemy.yml')) {
+            $this->writeln('<comment>No alchemy.yml found. Run `alchemy init` first — `alchemy all` runs what your file configures.</comment>');
+            return 1;
+        }
+
         $this->loadAlchemyConfig();
 
         return $this->runAll();
