@@ -152,7 +152,8 @@ test('standing tests.flags reach the engine invocation', function () {
     [$exit, $output] = alchemy('test');
 
     expect($exit)->toBe(0)
-        ->and($output)->toContain('flag run works');
+        ->and($output)->toContain('flag run works')
+        ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml'))->toBeFalse();
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
 test('all runs exactly the sections present in alchemy.yml', function () {
@@ -167,7 +168,8 @@ test('all runs exactly the sections present in alchemy.yml', function () {
     expect($exit)->toBe(0)
         ->and($output)->toContain('Running linter')
         ->and($output)->not->toContain('Using pest')
-        ->and($output)->toContain('Everything in alchemy.yml ran clean');
+        ->and($output)->toContain('Everything in alchemy.yml ran clean')
+        ->and(file_exists(getcwd() . '/.alchemy/.php_cs.dist.php'))->toBeFalse();
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
 test('ci generates pipelines for every configured provider', function () {

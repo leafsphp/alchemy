@@ -183,7 +183,7 @@ tests: phpunit.xml # a string section = "run this tool from my file, as-is"
 analyse: phpstan.dist.neon
 ```
 
-A map section is alchemy-managed (config generated into `.alchemy/`, root never touched); a string section runs the engine against your file verbatim. Either way the decision lives in `alchemy.yml`, so CI and teammates get the same behavior. As a safety net, a tool with no section at all but an existing config file in the project still runs on that file. And `alchemy eject` exports real config files if you ever want to leave.
+A map section is alchemy-managed (config generated fresh per run inside `.alchemy/` and discarded after — only caches stay; the root is never touched); a string section runs the engine against your file verbatim. Either way the decision lives in `alchemy.yml`, so CI and teammates get the same behavior. As a safety net, a tool with no section at all but an existing config file in the project still runs on that file. And `alchemy eject` exports real config files if you ever want to leave.
 
 The typical workflow, fresh or existing project:
 

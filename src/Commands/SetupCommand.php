@@ -277,12 +277,28 @@ class SetupCommand extends Command
                 $this->write($line);
             });
 
+        $this->discardGeneratedConfig('phpunit.xml');
+
         if ($testProcess !== 0) {
             $this->writeln('<error>Tests failed. Check your code and try again.</error>');
             return 1;
         }
 
         return 0;
+    }
+
+    /**
+     * Generated configs are disposable — the run is over, only caches stay.
+     * (Even a killed run leaves residue only inside gitignored .alchemy,
+     * where the next run overwrites it.)
+     */
+    protected function discardGeneratedConfig(string $file): void
+    {
+        $generated = getcwd() . '/.alchemy/' . $file;
+
+        if (file_exists($generated)) {
+            \Leaf\FS\File::delete($generated);
+        }
     }
 
     /**
@@ -353,6 +369,10 @@ class SetupCommand extends Command
                 $this->write($line);
             });
 
+        if (strpos($refactorConfigPath, '/.alchemy/') !== false) {
+            $this->discardGeneratedConfig('.rector.dist.php');
+        }
+
         if ($refactorProcess !== 0) {
             $this->writeln($check
                 ? '<error>Pending refactors found. Run `composer run refactor` locally to apply them.</error>'
@@ -412,6 +432,10 @@ class SetupCommand extends Command
             ->run(function ($type, $line): void {
                 $this->write($line);
             });
+
+        if (strpos($analyseConfigPath, '/.alchemy/') !== false) {
+            $this->discardGeneratedConfig('.phpstan.dist.neon');
+        }
 
         if ($analyseProcess !== 0) {
             $this->writeln('<error>Static analysis found issues. Fix them and run `composer run analyse` again.</error>');
@@ -508,6 +532,8 @@ class SetupCommand extends Command
             ->run(function ($type, $line): void {
                 $this->write($line);
             });
+
+        $this->discardGeneratedConfig('.php_cs.dist.php');
 
         if ($lintProcess !== 0) {
             $this->writeln($check
