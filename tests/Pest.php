@@ -13,7 +13,13 @@
 function sandboxSetup(): void
 {
     $GLOBALS['__alchemyTestCwd'] = getcwd();
-    $sandbox = sys_get_temp_dir() . '/alchemy-test-' . bin2hex(random_bytes(6));
+
+    // a fixed all-letter base, not sys_get_temp_dir(): macOS temp paths
+    // contain random segments that can start with a digit (/var/folders/8j/…),
+    // and nested pest builds eval'd class namespaces from absolute paths when
+    // the sandbox vendor is a symlink — a digit-leading segment is a parse error
+    $base = PHP_OS_FAMILY === 'Windows' ? sys_get_temp_dir() : '/tmp';
+    $sandbox = $base . '/alchemy-test-' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyz'), 0, 10);
 
     mkdir($sandbox, 0777, true);
     chdir($sandbox);
