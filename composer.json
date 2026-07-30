@@ -25,7 +25,7 @@
         "leafs/fs": "*",
         "leafs/sprout": "*",
         "symfony/yaml": "*",
-        "php": "^8.0"
+        "php": "^8.2"
     },
     "bin": [
         "bin/alchemy"
