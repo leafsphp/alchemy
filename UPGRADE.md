@@ -53,6 +53,16 @@ The old eject command targeted a config format that no longer existed. `alchemy 
 - **Windows-friendly scripts**: composer scripts are written as `@php vendor/bin/alchemy ...` so they run on every platform
 - Everything still installs lazily — no engine is added to your project until the command that needs it first runs
 
+## Unpin your engines
+
+Older alchemy versions installed engines with `composer require pestphp/pest --dev`, which froze the constraint at whatever major was current (`^2.0`, `^3.8`, …) — so newer majors never arrive even on a PHP that supports them. Alchemy 5 installs with `pestphp/pest:*` instead: composer always resolves the newest version your PHP allows. If your composer.json carries an old pin, unpin once and you're future-proof:
+
+```bash
+composer require 'pestphp/pest:*' --dev --with-all-dependencies
+```
+
+(Same idea for `phpunit/phpunit`, `phpstan/phpstan` or `rector/rector` if an older setup pinned them.)
+
 ## Config keys that moved or matter
 
 | v4 | v5 |
