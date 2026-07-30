@@ -62,7 +62,7 @@ class SwitchCommand extends SetupCommand
         $this->writeln('<comment>Note: alchemy.yml was rewritten, so any comments in it were dropped.</comment>');
 
         Core::set($config);
-        \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
+        Core::ensureAlchemyDir();
         $this->generateActions();
 
         $leftoverFiles = [];

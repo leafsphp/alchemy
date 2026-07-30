@@ -118,9 +118,7 @@ class InitCommand extends Command
      */
     protected function parkPortedConfig(string $file): void
     {
-        if (!is_dir(getcwd() . '/.alchemy')) {
-            mkdir(getcwd() . '/.alchemy', 0777, true);
-        }
+        Core::ensureAlchemyDir();
 
         if (@rename(getcwd() . "/$file", getcwd() . "/.alchemy/$file.bak")) {
             $this->writeln("<info>Imported $file into alchemy.yml — original parked at .alchemy/$file.bak.</info>");

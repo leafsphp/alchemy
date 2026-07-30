@@ -113,7 +113,7 @@ class SetupCommand extends Command
             Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
         }
 
-        \Leaf\FS\Directory::create(getcwd() . '/.alchemy');
+        Core::ensureAlchemyDir();
     }
 
     /**

@@ -174,6 +174,8 @@ A `phpstan-baseline.neon` at your project root is included automatically, and **
 
 (`alchemy setup` is a deprecated alias for `alchemy all`.)
 
+Coming from Alchemy 4? See the [upgrade guide](https://leafphp.dev/docs/utils/testing#upgrading-from-alchemy-4) — v4 scripts keep working, and the guide covers what changed.
+
 Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine — pest arrives on your first `composer run test`, phpstan on your first `composer run analyse`, never before.
 
 Alchemy also never takes over a setup you didn't hand it. When `init` finds an existing tool config it asks: **port it** into `alchemy.yml` (phpunit.xml and php-cs-fixer configs map fully; phpstan neon files port through the `analyse` passthrough; `rector.php` is read directly from the rector config itself) — or **keep it**, recorded in `alchemy.yml` as a pinned file:
