@@ -102,7 +102,7 @@ class InitCommand extends Command
         }
 
         if ($imported = $import($config, $file)) {
-            $this->writeln("<info>Imported $file into alchemy.yml — you can delete $file now.</info>");
+            $this->parkPortedConfig($file);
             return $imported;
         }
 
@@ -110,6 +110,23 @@ class InitCommand extends Command
         $config[$tool] = $file;
 
         return $config;
+    }
+
+    /**
+     * A ported config's job is done — park the original inside .alchemy as a
+     * .bak so the project root is clean without the user deleting anything
+     */
+    protected function parkPortedConfig(string $file): void
+    {
+        if (!is_dir(getcwd() . '/.alchemy')) {
+            mkdir(getcwd() . '/.alchemy', 0777, true);
+        }
+
+        if (@rename(getcwd() . "/$file", getcwd() . "/.alchemy/$file.bak")) {
+            $this->writeln("<info>Imported $file into alchemy.yml — original parked at .alchemy/$file.bak.</info>");
+        } else {
+            $this->writeln("<info>Imported $file into alchemy.yml — you can delete $file now.</info>");
+        }
     }
 
     protected function isInteractive(): bool

@@ -75,7 +75,9 @@ XML);
         ->and($yml)->toContain('Unit:')
         ->and($yml)->toContain("- '*Test.php'")
         ->and($yml)->toContain('APP_ENV: testing')
-        ->and($yml)->toContain('stopOnFailure: true');
+        ->and($yml)->toContain('stopOnFailure: true')
+        ->and(file_exists(getcwd() . '/phpunit.xml'))->toBeFalse()
+        ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml.bak'))->toBeTrue();
 });
 
 test('init records use-as-is choices as pinned string sections', function () {
@@ -117,7 +119,9 @@ NEON);
         ->and($yml)->toContain('level: 8')
         ->and($yml)->toContain('baseline: phpstan-baseline.neon')
         ->and($yml)->toContain('- vendor/phpstan/phpstan/conf/bleedingEdge.neon')
-        ->and($yml)->toContain('treatPhpDocTypesAsCertain: false');
+        ->and($yml)->toContain('treatPhpDocTypesAsCertain: false')
+        ->and(file_exists(getcwd() . '/phpstan.dist.neon'))->toBeFalse()
+        ->and(file_exists(getcwd() . '/.alchemy/phpstan.dist.neon.bak'))->toBeTrue();
 });
 
 test('tests run from a pinned phpunit.xml string section', function () {
