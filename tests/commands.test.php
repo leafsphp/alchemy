@@ -141,9 +141,9 @@ XML);
 
     [$exit, $output] = alchemy('test');
 
-    expect($exit)->toBe(0)
-        ->and($output)->toContain('Using your existing phpunit.xml')
-        ->and($output)->toContain('runs from the pinned config');
+    \PHPUnit\Framework\Assert::assertSame(0, $exit, "inner alchemy test failed:\n$output");
+    expect($output)->toContain('Using your existing phpunit.xml')
+        ->toContain('runs from the pinned config');
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
 test('standing tests.flags reach the engine invocation', function () {
@@ -155,8 +155,8 @@ test('standing tests.flags reach the engine invocation', function () {
 
     [$exit, $output] = alchemy('test');
 
-    expect($exit)->toBe(0)
-        ->and($output)->toContain('flag run works')
+    \PHPUnit\Framework\Assert::assertSame(0, $exit, "inner alchemy test failed:\n$output");
+    expect($output)->toContain('flag run works')
         ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml'))->toBeFalse();
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 
@@ -329,8 +329,8 @@ XML);
 
     [$exit, $output] = alchemy('test');
 
-    expect($exit)->toBe(0)
-        ->and($output)->toContain('Using your existing phpunit.xml')
+    \PHPUnit\Framework\Assert::assertSame(0, $exit, "inner alchemy test failed:\n$output");
+    expect($output)->toContain('Using your existing phpunit.xml')
         ->and($output)->toContain('runs on the user suite')
         ->and(file_get_contents(getcwd() . '/phpunit.xml'))->toBe($userConfigBefore)
         ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml.user'))->toBeFalse();
