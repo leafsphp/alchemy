@@ -7,6 +7,9 @@ tests:
     - tests
   files:
     - '*.test.php'
+  coverage:
+    local: false
+    actions: true
 
 lint:
   preset: PSR12
@@ -16,7 +19,25 @@ lint:
     array_syntax:
       syntax: short
 
+analyse:
+  level: 5
+  paths:
+    - src
+  baseline: phpstan-baseline.neon
+  includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+  treatPhpDocTypesAsCertain: false
+
+refactor:
+  php: '8.3'
+  sets:
+    - dead-code
+    - code-quality
+  fluent-new-line: true
+  import-names: true
+
 actions:
+  provider: github
   run:
     - lint
     - tests
@@ -27,12 +48,9 @@ actions:
   php:
     extensions: json, zip
     versions:
-      - '8.1'
       - '8.2'
       - '8.3'
+      - '8.4'
   events:
     - push
     - pull_request
-  tests:
-    coverage:
-      actions: false
