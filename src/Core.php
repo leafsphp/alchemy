@@ -217,11 +217,13 @@ class Core
     /**
      * Generated configs live inside .alchemy — make sure it exists.
      */
-    protected static function ensureAlchemyDir(): void
+    public static function ensureAlchemyDir(): void
     {
         if (!is_dir(getcwd() . '/.alchemy')) {
             mkdir(getcwd() . '/.alchemy', 0777, true);
         }
+
+        static::updateGitIgnore();
     }
 
     public static function cleanStaleRootConfigs(): void
@@ -287,7 +289,8 @@ class Core
         }
 
         if (strpos($gitIgnoreContent, '.phpunit.result.cache') === false) {
-            file_put_contents($appGitIgnoreFile, ".phpunit.result.cache\n", FILE_APPEND);
+            $prefix = ($gitIgnoreContent === '' || substr($gitIgnoreContent, -1) === "\n" || strpos($gitIgnoreContent, '.alchemy') === false) ? '' : "\n";
+            file_put_contents($appGitIgnoreFile, "$prefix.phpunit.result.cache\n", FILE_APPEND);
         }
     }
 
