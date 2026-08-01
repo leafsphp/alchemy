@@ -587,7 +587,24 @@ class SetupCommand extends Command
 
     protected function generateGithubActions($config)
     {
-        $actionToRun = $config['run'] ?? [];
+        $actionToRun = array_unique(array_map(
+            fn ($action) => $action === 'test' ? 'tests' : $action,
+            $config['run'] ?? []
+        ));
+
+        $validActions = array_map(
+            fn ($stub) => basename($stub, '.yml'),
+            glob(dirname(__DIR__) . '/setup/workflows/*.yml') ?: []
+        );
+
+        if ($unknownActions = array_diff($actionToRun, $validActions)) {
+            $this->writeln(
+                '<error>Unknown action(s) in actions.run: ' . implode(', ', $unknownActions) .
+                    '. Valid actions are: ' . implode(', ', $validActions) . '.</error>'
+            );
+
+            return 1;
+        }
 
         \Leaf\FS\Directory::create(getcwd() . '/.github');
 
@@ -603,8 +620,15 @@ class SetupCommand extends Command
             $lintAutofix = is_array(Core::get('lint')) ? (Core::get('lint')['autofix'] ?? false) : false;
 
             $actionsToWrite = [];
-            $database = is_array(Core::get('tests')) ? (Core::get('tests')['database'] ?? false) : false;
-            $actionsCoverage = ($config['tests']['coverage']['actions'] ?? true) ? 'xdebug' : 'none';
+            $testsConfig = is_array(Core::get('tests')) ? Core::get('tests') : [];
+            $database = $testsConfig['database'] ?? false;
+
+            $actionsCoverage = (
+                $config['tests']['coverage']['actions'] ??
+                $testsConfig['coverage']['actions'] ??
+                true
+            ) ? 'xdebug' : 'none';
+
             $coverageFlags = $actionsCoverage !== 'none' ? ' -- --flags=coverage' : '';
 
             if ($database) {

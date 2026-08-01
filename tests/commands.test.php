@@ -213,6 +213,98 @@ YML);
     expect(file_get_contents(getcwd() . '/.circleci/config.yml'))->toContain('version: 2.1');
 });
 
+test('ci treats run: [test] as tests, like the gitlab generator does', function () {
+    writeComposerJson();
+    file_put_contents(getcwd() . '/alchemy.yml', <<<'YML'
+app:
+  - src
+
+tests:
+  engine: pest
+
+actions:
+  run:
+    - test
+YML);
+
+    [$exit] = alchemy('ci');
+
+    expect($exit)->toBe(0)
+        ->and(file_exists(getcwd() . '/.github/workflows/tests.yml'))->toBeTrue()
+        ->and(file_exists(getcwd() . '/.github/workflows/test.yml'))->toBeFalse();
+});
+
+test('ci rejects unknown action names instead of writing empty workflows', function () {
+    writeComposerJson();
+    file_put_contents(getcwd() . '/alchemy.yml', <<<'YML'
+app:
+  - src
+
+tests:
+  engine: pest
+
+actions:
+  run:
+    - linting
+YML);
+
+    [$exit, $output] = alchemy('ci');
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('Unknown action(s) in actions.run: linting')
+        ->and($output)->toContain('lint')
+        ->and(file_exists(getcwd() . '/.github/workflows/linting.yml'))->toBeFalse();
+});
+
+test('coverage can be disabled from the top-level tests section', function () {
+    writeComposerJson();
+    file_put_contents(getcwd() . '/alchemy.yml', <<<'YML'
+app:
+  - src
+
+tests:
+  engine: pest
+  coverage:
+    actions: false
+
+actions:
+  run:
+    - tests
+YML);
+
+    [$exit] = alchemy('ci');
+    $workflow = file_get_contents(getcwd() . '/.github/workflows/tests.yml');
+
+    expect($exit)->toBe(0)
+        ->and($workflow)->toContain('coverage: none')
+        ->and($workflow)->not->toContain('--flags=coverage');
+});
+
+test('the actions section can still override coverage per-ci', function () {
+    writeComposerJson();
+    file_put_contents(getcwd() . '/alchemy.yml', <<<'YML'
+app:
+  - src
+
+tests:
+  engine: pest
+  coverage:
+    actions: false
+
+actions:
+  run:
+    - tests
+  tests:
+    coverage:
+      actions: true
+YML);
+
+    [$exit] = alchemy('ci');
+
+    expect($exit)->toBe(0)
+        ->and(file_get_contents(getcwd() . '/.github/workflows/tests.yml'))->toContain('coverage: xdebug');
+});
+
 test('switch moves ci providers and cleans up old files', function () {
     writeComposerJson();
     file_put_contents(getcwd() . '/alchemy.yml', <<<'YML'
