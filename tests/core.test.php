@@ -118,6 +118,89 @@ test('lint config renders preset, rules and excludes', function () {
         ->toContain('->setCacheFile(');
 });
 
+test('pint config maps fixer preset spellings and carries rules and excludes', function () {
+    Core::set([
+        'app' => ['src'],
+        'lint' => [
+            'provider' => 'pint',
+            'preset' => 'PSR12',
+            'exclude' => ['legacy'],
+            'rules' => ['single_quote' => true],
+        ],
+    ]);
+    Core::generatePintConfig();
+
+    $config = json_decode(file_get_contents(getcwd() . '/.alchemy/pint.json'), true);
+
+    expect($config['preset'])->toBe('psr12')
+        ->and($config['rules'])->toBe(['single_quote' => true])
+        ->and($config['exclude'])->toBe(['legacy']);
+});
+
+test('pint config passes pint-only keys through verbatim', function () {
+    Core::set([
+        'app' => ['app'],
+        'lint' => [
+            'provider' => 'pint',
+            'preset' => 'laravel',
+            'risky' => false, // alchemy-only key, must not leak into pint.json
+            'notPath' => ['bootstrap/cache'],
+            'notName' => ['*-blueprint.php'],
+        ],
+    ]);
+    Core::generatePintConfig();
+
+    $config = json_decode(file_get_contents(getcwd() . '/.alchemy/pint.json'), true);
+
+    expect($config['notPath'])->toBe(['bootstrap/cache'])
+        ->and($config['notName'])->toBe(['*-blueprint.php'])
+        ->and($config)->not->toHaveKey('risky')
+        ->and($config)->not->toHaveKey('provider');
+});
+
+test('pint config defaults to the laravel preset', function () {
+    Core::set(['app' => ['src'], 'lint' => ['provider' => 'pint']]);
+    Core::generatePintConfig();
+
+    expect(json_decode(file_get_contents(getcwd() . '/.alchemy/pint.json'), true))
+        ->toBe(['preset' => 'laravel']);
+});
+
+test('pest is the default engine; phpunit only wins when present without pest', function () {
+    // nothing installed, nothing declared: pest
+    expect(Core::detectTestEngine())->toBe('pest');
+
+    // declared in composer.json (fresh clone, no vendor yet)
+    file_put_contents(getcwd() . '/composer.json', json_encode(['require-dev' => ['phpunit/phpunit' => '^11.0']]));
+    expect(Core::detectTestEngine())->toBe('phpunit');
+
+    file_put_contents(getcwd() . '/composer.json', json_encode(['require-dev' => ['phpunit/phpunit' => '^11.0', 'pestphp/pest' => '^4.0']]));
+    expect(Core::detectTestEngine())->toBe('pest');
+
+    // installed binaries outrank composer.json — pest ships phpunit's binary too
+    mkdir(getcwd() . '/vendor/bin', 0777, true);
+    file_put_contents(getcwd() . '/composer.json', json_encode(['name' => 'alchemy/sandbox']));
+    touch(getcwd() . '/vendor/bin/phpunit');
+    expect(Core::detectTestEngine())->toBe('phpunit');
+
+    touch(getcwd() . '/vendor/bin/pest');
+    expect(Core::detectTestEngine())->toBe('pest');
+});
+
+test('lint provider normalizes spellings and rejects unknown tools', function () {
+    Core::set(['lint' => []]);
+    expect(Core::lintProvider())->toBe('phpcsfixer');
+
+    Core::set(['lint' => ['provider' => 'php-cs-fixer']]);
+    expect(Core::lintProvider())->toBe('phpcsfixer');
+
+    Core::set(['lint' => ['provider' => 'Pint']]);
+    expect(Core::lintProvider())->toBe('pint');
+
+    Core::set(['lint' => ['provider' => 'eslint']]);
+    expect(Core::lintProvider())->toBeNull();
+});
+
 test('rector config renders php sets, prepared sets, skips and rules', function () {
     Core::set([
         'app' => ['src'],
@@ -193,6 +276,17 @@ test('phpstan config includes the pest plugin when installed without extension-i
 
     expect(file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon'))
         ->not->toContain('pest-plugin-phpstan');
+});
+
+test('phpstan config includes larastan when installed without extension-installer', function () {
+    mkdir(getcwd() . '/vendor/larastan/larastan', 0777, true);
+    file_put_contents(getcwd() . '/vendor/larastan/larastan/extension.neon', "services: []\n");
+
+    Core::set(['app' => ['app'], 'analyse' => ['level' => 5]]);
+    Core::generateAnalyseFiles();
+
+    expect(file_get_contents(getcwd() . '/.alchemy/.phpstan.dist.neon'))
+        ->toContain('- ' . getcwd() . "/vendor/larastan/larastan/extension.neon\n");
 });
 
 test('phpstan config passes unknown analyse keys through as parameters', function () {

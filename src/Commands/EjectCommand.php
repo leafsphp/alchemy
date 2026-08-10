@@ -28,38 +28,47 @@ class EjectCommand extends Command
             Core::set(Yaml::parseFile(dirname(__DIR__) . '/setup/alchemy.yml'));
         }
 
+        $lintProvider = Core::lintProvider() ?? 'phpcsfixer';
+        $lintFile = $lintProvider === 'pint' ? 'pint.json' : '.php-cs-fixer.dist.php';
+
         if (
             !$this->option('force')
-            && (file_exists(getcwd() . '/phpunit.xml') || file_exists(getcwd() . '/.php-cs-fixer.dist.php'))
+            && (file_exists(getcwd() . '/phpunit.xml') || file_exists(getcwd() . "/$lintFile"))
         ) {
-            $this->writeln('<error>phpunit.xml or .php-cs-fixer.dist.php already exists. Re-run with --force to overwrite.</error>');
+            $this->writeln("<error>phpunit.xml or $lintFile already exists. Re-run with --force to overwrite.</error>");
             return 1;
         }
 
-        \Leaf\FS\File::delete(getcwd() . '/.php-cs-fixer.dist.php');
-
         Core::generateTestFiles(true);
-        Core::generateLintFiles(true);
 
-        // php-cs-fixer picks .php-cs-fixer.dist.php up without any flags
-        \Leaf\FS\File::move(getcwd() . '/.php_cs.dist.php', getcwd() . '/.php-cs-fixer.dist.php');
+        if ($lintProvider === 'pint') {
+            Core::generatePintConfig(true);
+        } else {
+            \Leaf\FS\File::delete(getcwd() . '/.php-cs-fixer.dist.php');
+            Core::generateLintFiles(true);
 
-        $this->updateComposerScripts();
+            // php-cs-fixer picks .php-cs-fixer.dist.php up without any flags
+            \Leaf\FS\File::move(getcwd() . '/.php_cs.dist.php', getcwd() . '/.php-cs-fixer.dist.php');
+        }
 
-        $this->writeln('<info>Config exported: phpunit.xml + .php-cs-fixer.dist.php</info>');
+        $this->updateComposerScripts($lintProvider);
+
+        $this->writeln("<info>Config exported: phpunit.xml + $lintFile</info>");
         $this->writeln('<comment>Your composer test/lint scripts now call your engines directly.</comment>');
         $this->writeln('<comment>You can now remove alchemy with `composer remove leafs/alchemy` and delete alchemy.yml.</comment>');
 
         return 0;
     }
 
-    protected function updateComposerScripts()
+    protected function updateComposerScripts(string $lintProvider = 'phpcsfixer')
     {
         $engine = Core::get('tests')['engine'] ?? 'pest';
         $appComposerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
 
         $appComposerJson['scripts']['test'] = "@php vendor/bin/$engine";
-        $appComposerJson['scripts']['lint'] = '@php vendor/bin/php-cs-fixer fix';
+        $appComposerJson['scripts']['lint'] = $lintProvider === 'pint'
+            ? '@php vendor/bin/pint'
+            : '@php vendor/bin/php-cs-fixer fix';
         unset($appComposerJson['scripts']['alchemy'], $appComposerJson['scripts']['actions']);
 
         file_put_contents(getcwd() . '/composer.json', json_encode($appComposerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

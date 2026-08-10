@@ -61,8 +61,17 @@ lint:
       case_sensitive: false
       sort_algorithm: 'alpha'
 
+analyse:
+  level: 5
+
+refactor:
+  php: true # upgrade sets for the PHP version in your composer.json
+  sets:
+    - dead-code
+    - code-quality
+
 actions:
-  run:
+  run: # CI defaults to the universal jobs — add analyse/refactor to gate merges on them too
     - 'lint'
     - 'tests'
   php:
@@ -73,6 +82,8 @@ actions:
     - 'push'
     - 'pull_request'
 ```
+
+`alchemy init` writes all of these sections — a section's presence is what opts a tool in, so the full pipeline is on by default and deleting a section is how you say no.
 
 You can make edits to this file to suit your needs. The `app` key is an array of directories to look for your app files in. The `tests` key is an array of configurations for your tests. The `lint` key is an array of configurations for your code styling checks.
 
@@ -113,6 +124,16 @@ lint:
   exclude:
     - legacy
 ```
+
+The linter is swappable too. Laravel projects usually already lint with [Pint](https://laravel.com/docs/pint), so `lint` takes a `provider` key (`phpcsfixer` is the default) — and since Pint's rules *are* php-cs-fixer rules, your `rules` and `exclude` entries carry over unchanged, with Pint-only keys (`notPath`, `notName`) passing through verbatim. `alchemy init` selects Pint with the `laravel` preset automatically in a Laravel project, and ports an existing `pint.json` completely:
+
+```yaml
+lint:
+  provider: pint
+  preset: laravel
+```
+
+Pint's runtime flags forward through `--flags` (`composer run fmt -- --flags=dirty` only fixes uncommitted files), and on the analysis side a Laravel project running `composer run analyse` gets [Larastan](https://github.com/larastan/larastan) installed and wired in automatically — phpstan that actually understands facades, Eloquent and container magic.
 
 Alchemy can also manage [Rector](https://getrector.com) for automated refactoring. Add a `refactor` section and run `composer run refactor` (or `-- --check` in CI to fail on pending refactors — add `refactor` to `actions.run` to generate the workflow):
 
@@ -161,7 +182,7 @@ A `phpstan-baseline.neon` at your project root is included automatically, and **
 
 | Command | What it does |
 | --- | --- |
-| `alchemy init` | Create alchemy.yml — detects your framework and asks whether to **port existing tool configs** (phpunit.xml, php-cs-fixer, phpstan neon, rector.php) or keep them (`--port` / `--keep` to answer for every tool without prompts) |
+| `alchemy init` | Create alchemy.yml — detects your framework and asks whether to **port existing tool configs** (phpunit.xml, php-cs-fixer, pint.json, phpstan neon, rector.php) or keep them (`--port` / `--keep` to answer for every tool without prompts) |
 | `alchemy test` | Run your tests (installs your engine on first run) |
 | `alchemy lint` | Check code style — reports violations, changes nothing |
 | `alchemy fmt` | Fix code style |
@@ -178,7 +199,7 @@ Coming from Alchemy 4? See the [upgrade guide](https://leafphp.dev/docs/utils/te
 
 Every tool is installed lazily: requiring alchemy adds nothing to your dependency tree until you actually run a command that needs an engine — pest arrives on your first `composer run test`, phpstan on your first `composer run analyse`, never before.
 
-Alchemy also never takes over a setup you didn't hand it. When `init` finds an existing tool config it asks: **port it** into `alchemy.yml` (phpunit.xml and php-cs-fixer configs map fully; phpstan neon files port through the `analyse` passthrough; `rector.php` is read directly from the rector config itself) — or **keep it**, recorded in `alchemy.yml` as a pinned file:
+Alchemy also never takes over a setup you didn't hand it. When `init` finds an existing tool config it asks: **port it** into `alchemy.yml` (phpunit.xml, php-cs-fixer and pint configs map fully; phpstan neon files port through the `analyse` passthrough; `rector.php` is read directly from the rector config itself) — or **keep it**, recorded in `alchemy.yml` as a pinned file:
 
 ```yaml
 tests: phpunit.xml # a string section = "run this tool from my file, as-is"

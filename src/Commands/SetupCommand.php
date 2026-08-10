@@ -124,7 +124,7 @@ class SetupCommand extends Command
     protected function userEngineConfig(string $tool): ?string
     {
         if ($tool === 'lint' && empty($this->projectConfig['lint'])) {
-            foreach (['.php-cs-fixer.php', '.php-cs-fixer.dist.php'] as $file) {
+            foreach (['.php-cs-fixer.php', '.php-cs-fixer.dist.php', 'pint.json'] as $file) {
                 if (file_exists(getcwd() . "/$file")) {
                     return $file;
                 }
@@ -169,7 +169,7 @@ class SetupCommand extends Command
         // a pinned config file or a project with its own phpunit.xml and no
         // tests section runs on its own config
         if ($userConfig) {
-            $engine = file_exists(getcwd() . '/vendor/bin/phpunit') && !file_exists(getcwd() . '/vendor/bin/pest') ? 'phpunit' : 'pest';
+            $engine = Core::detectTestEngine();
         }
 
         $engineInstaller = $engine === 'pest' ? '\'pestphp/pest:*\' --dev --with-all-dependencies' : '\'phpunit/phpunit:*\' --dev';
@@ -420,6 +420,7 @@ class SetupCommand extends Command
             $analyseConfigPath = getcwd() . '/' . $userPhpstanConfig;
         } else {
             $this->ensurePestPhpstanPlugin();
+            $this->ensureLarastan();
             Core::generateAnalyseFiles();
             $analyseConfigPath = getcwd() . '/.alchemy/.phpstan.dist.neon';
         }
@@ -481,28 +482,52 @@ class SetupCommand extends Command
         }
     }
 
+    /**
+     * Raw phpstan on a Laravel app drowns in facade/magic false positives —
+     * larastan is how Laravel is actually analysed, so wire it in
+     */
+    protected function ensureLarastan()
+    {
+        if (is_dir(getcwd() . '/vendor/larastan/larastan')) {
+            return;
+        }
+
+        $composerJson = json_decode((string) @file_get_contents(getcwd() . '/composer.json'), true) ?? [];
+        $deps = array_merge($composerJson['require'] ?? [], $composerJson['require-dev'] ?? []);
+
+        if (!isset($deps['laravel/framework'])) {
+            return;
+        }
+
+        $this->writeln("<info>Laravel project detected — adding larastan so phpstan understands facades, Eloquent and container magic...</info>\n");
+
+        if (!sprout()->composer()->install('larastan/larastan --dev')->isSuccessful()) {
+            $this->writeln("<comment>Couldn't install larastan/larastan. Continuing with plain phpstan.</comment>\n");
+        }
+    }
+
     protected function runLinter()
     {
-        if (!file_exists(getcwd() . '/vendor/bin/php-cs-fixer')) {
-            $this->writeln("<info>Setting up linting with php-cs-fixer...</info>\n");
+        $check = $this->checkMode();
 
-            if (!sprout()->composer()->install('friendsofphp/php-cs-fixer --dev')->isSuccessful()) {
-                $this->writeln('<error>Couldn\'t install PHP-CS-Fixer. Check your connection and try again.</error>');
+        // a pinned config file or a project with its own linter config and no
+        // lint section keeps its setup untouched — the file names the tool
+        if ($userConfig = ($this->pinnedConfig('lint') ?? $this->userEngineConfig('lint'))) {
+            $provider = basename($userConfig) === 'pint.json' ? 'pint' : 'phpcsfixer';
+
+            if ($this->ensureLinterInstalled($provider) !== 0) {
                 return 1;
             }
 
-            $this->writeln('<info>Linter installed successfully!</info>');
-        }
-
-        $check = $this->checkMode();
-
-        // a pinned config file or a project with its own fixer config and no
-        // lint section keeps its setup untouched
-        if ($userConfig = ($this->pinnedConfig('lint') ?? $this->userEngineConfig('lint'))) {
             $this->writeln("<comment>Using your existing $userConfig...</comment>\n");
 
+            $lintCommand = $provider === 'pint'
+                ? getcwd() . "/vendor/bin/pint --config $userConfig" . ($check ? ' --test' : '')
+                : getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : '');
+            $lintCommand .= $this->linterFlagOptions();
+
             $lintProcess = sprout()
-                ->process(getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : ''))
+                ->process($lintCommand)
                 ->setTimeout(null)
                 ->run(function ($type, $line): void {
                     $this->write($line);
@@ -518,22 +543,50 @@ class SetupCommand extends Command
             return 0;
         }
 
-        Core::generateLintFiles();
+        $provider = Core::lintProvider();
+
+        if ($provider === null) {
+            $lintConfig = is_array(Core::get('lint')) ? Core::get('lint') : [];
+            $this->writeln('<error>Unknown lint provider "' . ($lintConfig['provider'] ?? '') . '". Supported: phpcsfixer, pint.</error>');
+            return 1;
+        }
+
+        if ($this->ensureLinterInstalled($provider) !== 0) {
+            return 1;
+        }
 
         $lintConfig = is_array(Core::get('lint')) ? Core::get('lint') : [];
-        $risky = ($lintConfig['risky'] ?? true) ? ' --allow-risky=yes' : '';
-        $lintFlags = $risky . ($check ? ' --dry-run --diff' : '');
 
         $this->writeln($check ? "<comment>Checking code style...</comment>\n" : "<comment>Running linter...</comment>\n");
 
+        if ($provider === 'pint') {
+            Core::generatePintConfig();
+
+            $lintFlags = ' --config ' . getcwd() . '/.alchemy/pint.json --cache-file ' . getcwd() . '/.alchemy/.pint.cache';
+            $lintFlags .= ($lintConfig['parallel'] ?? false) ? ' --parallel' : '';
+            $lintFlags .= $check ? ' --test' : '';
+            $lintFlags .= $this->linterFlagOptions();
+
+            // pint carries paths as arguments, not config
+            $lintCommand = getcwd() . '/vendor/bin/pint'
+                . ($this->lintPaths($lintConfig) ? ' ' . implode(' ', $this->lintPaths($lintConfig)) : '')
+                . $lintFlags;
+        } else {
+            Core::generateLintFiles();
+
+            $risky = ($lintConfig['risky'] ?? true) ? ' --allow-risky=yes' : '';
+            $lintFlags = $risky . ($check ? ' --dry-run --diff' : '') . $this->linterFlagOptions();
+            $lintCommand = getcwd() . '/vendor/bin/php-cs-fixer fix --config=' . getcwd() . "/.alchemy/.php_cs.dist.php$lintFlags";
+        }
+
         $lintProcess = sprout()
-            ->process(getcwd() . '/vendor/bin/php-cs-fixer fix --config=' . getcwd() . "/.alchemy/.php_cs.dist.php$lintFlags")
+            ->process($lintCommand)
             ->setTimeout(null)
             ->run(function ($type, $line): void {
                 $this->write($line);
             });
 
-        $this->discardGeneratedConfig('.php_cs.dist.php');
+        $this->discardGeneratedConfig($provider === 'pint' ? 'pint.json' : '.php_cs.dist.php');
 
         if ($lintProcess !== 0) {
             $this->writeln($check
@@ -541,6 +594,59 @@ class SetupCommand extends Command
                 : '<error>Linting failed. Check your code and try again.</error>');
             return 1;
         }
+
+        return 0;
+    }
+
+    /**
+     * Same lint scope for both providers: app paths, plus test paths unless
+     * ignore_tests. Empty means the project root (pint skips vendor itself).
+     */
+    protected function lintPaths(array $lintConfig): array
+    {
+        $appPaths = (array) (Core::get('app') ?? []);
+
+        if (!$appPaths) {
+            return [];
+        }
+
+        if (empty($lintConfig['ignore_tests'])) {
+            $testsConfig = is_array(Core::get('tests')) ? Core::get('tests') : [];
+            $appPaths = array_merge($appPaths, (array) ($testsConfig['paths'] ?? []));
+        }
+
+        return array_values(array_unique($appPaths));
+    }
+
+    /**
+     * `composer run fmt -- --flags=dirty` forwards any linter flag —
+     * pint's --dirty/--repair/--blade, the fixer's --path-mode, whatever
+     */
+    protected function linterFlagOptions(): string
+    {
+        return $this->option('flags')
+            ? (' --' . implode(' --', explode(',', $this->option('flags'))))
+            : '';
+    }
+
+    protected function ensureLinterInstalled(string $provider): int
+    {
+        [$binary, $package, $label] = $provider === 'pint'
+            ? ['pint', 'laravel/pint', 'Pint']
+            : ['php-cs-fixer', 'friendsofphp/php-cs-fixer', 'PHP-CS-Fixer'];
+
+        if (file_exists(getcwd() . "/vendor/bin/$binary")) {
+            return 0;
+        }
+
+        $this->writeln("<info>Setting up linting with $binary...</info>\n");
+
+        if (!sprout()->composer()->install("$package --dev")->isSuccessful()) {
+            $this->writeln("<error>Couldn't install $label. Check your connection and try again.</error>");
+            return 1;
+        }
+
+        $this->writeln('<info>Linter installed successfully!</info>');
 
         return 0;
     }

@@ -24,14 +24,29 @@ class InitCommand extends Command
             return 1;
         }
 
+        $framework = $this->detectFramework();
+
         $config = [
             'app' => $this->detectAppPaths(),
             'tests' => [
-                'engine' => file_exists(getcwd() . '/vendor/bin/phpunit') && !file_exists(getcwd() . '/vendor/bin/pest') ? 'phpunit' : 'pest',
+                'engine' => Core::detectTestEngine(),
             ],
-            'lint' => [
-                'preset' => 'PSR12',
+            // laravel ships pint, so a laravel project lints with the tool
+            // it already has — everything else defaults to php-cs-fixer
+            'lint' => $framework === 'Laravel'
+                ? ['provider' => 'pint', 'preset' => 'laravel']
+                : ['preset' => 'PSR12'],
+            // a section's presence is what opts a tool in, so init writes the
+            // full pipeline — deleting a section is how you say no
+            'analyse' => [
+                'level' => 5,
             ],
+            'refactor' => [
+                'php' => true,
+                'sets' => ['dead-code', 'code-quality'],
+            ],
+            // CI defaults to the two universal jobs; analyse/refactor run
+            // locally out of the box and join CI when added to this list
             'actions' => [
                 'run' => ['lint', 'tests'],
                 'events' => ['push', 'pull_request'],
@@ -44,8 +59,8 @@ class InitCommand extends Command
             return $this->importPhpunitXml($cfg);
         });
 
-        $config = $this->resolveExistingConfig($config, 'lint', ['.php-cs-fixer.dist.php', '.php-cs-fixer.php'], function ($cfg) {
-            return $this->importCsFixerConfig($cfg);
+        $config = $this->resolveExistingConfig($config, 'lint', ['pint.json', '.php-cs-fixer.dist.php', '.php-cs-fixer.php'], function ($cfg, $file) {
+            return $file === 'pint.json' ? $this->importPintConfig($cfg) : $this->importCsFixerConfig($cfg);
         });
 
         $config = $this->resolveExistingConfig($config, 'analyse', ['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'], function ($cfg, $file) {
@@ -56,12 +71,12 @@ class InitCommand extends Command
             return $this->importRectorConfig($cfg, $file);
         });
 
-        \Leaf\FS\File::create($configFile, Yaml::dump($config, 6, 2) . $this->optionalSectionsHint($config), ['overwrite' => true]);
+        \Leaf\FS\File::create($configFile, Yaml::dump($config, 6, 2), ['overwrite' => true]);
 
         Core::installComposerScripts();
         Core::updateGitIgnore();
 
-        $this->writeln('<info>alchemy.yml created for your ' . $this->detectFramework() . ' project.</info>');
+        $this->writeln("<info>alchemy.yml created for your $framework project.</info>");
         $this->writeln('<comment>Run `composer run test`, `composer run lint`, or `composer run alchemy` to get started.</comment>');
 
         return 0;
@@ -130,45 +145,6 @@ class InitCommand extends Command
     protected function isInteractive(): bool
     {
         return defined('STDIN') && function_exists('stream_isatty') && @stream_isatty(STDIN);
-    }
-
-    /**
-     * Commented examples of the optional sections, appended to a fresh
-     * alchemy.yml so the full feature set is discoverable
-     */
-    protected function optionalSectionsHint(array $config = []): string
-    {
-        $hints = '';
-
-        if (!isset($config['analyse'])) {
-            $hints .= <<<'YML'
-
-# static analysis with phpstan — uncomment to enable
-# (set to a filename, e.g. `analyse: phpstan.neon`, to run from your own config;
-# any other key here is passed through to phpstan verbatim)
-# analyse:
-#   level: 5
-#   baseline: phpstan-baseline.neon
-
-YML;
-        }
-
-        if (!isset($config['refactor'])) {
-            $hints .= <<<'YML'
-
-# automated refactoring with rector — uncomment to enable
-# (set to a filename, e.g. `refactor: rector.php`, to run from your own config)
-# refactor:
-#   php: '8.3'
-#   sets:
-#     - dead-code
-#     - code-quality
-#   import-names: true
-
-YML;
-        }
-
-        return $hints;
     }
 
     protected function detectFramework(): string
@@ -307,6 +283,25 @@ YML;
                 $config['tests']['coverage']['exclude'][] = (string) $file;
             }
         }
+
+        return $config;
+    }
+
+    /**
+     * Port a pint.json into a lint section with `provider: pint`. Pint's
+     * rules are php-cs-fixer rules and its other keys (notName, notPath, ...)
+     * round-trip verbatim through the lint section, so every pint.json ports.
+     */
+    protected function importPintConfig(array $config): ?array
+    {
+        $parsed = json_decode((string) @file_get_contents(getcwd() . '/pint.json'), true);
+
+        if (!is_array($parsed)) {
+            $this->writeln('<comment>Found a pint.json but could not parse it — skipping import.</comment>');
+            return null;
+        }
+
+        $config['lint'] = array_merge(['provider' => 'pint'], $parsed);
 
         return $config;
     }

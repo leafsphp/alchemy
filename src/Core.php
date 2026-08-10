@@ -319,12 +319,15 @@ class Core
             $includes[] = strpos($include, '/') === 0 ? $include : "$root/$include";
         }
 
-        // pest's phpstan plugin teaches the analyser pest's DSL — include it
-        // when installed (extension-installer users get it wired automatically)
-        $pestPluginNeon = "$root/vendor/pestphp/pest-plugin-phpstan/extension.neon";
-
-        if (file_exists($pestPluginNeon) && !is_dir("$root/vendor/phpstan/extension-installer")) {
-            $includes[] = $pestPluginNeon;
+        // pest's phpstan plugin teaches the analyser pest's DSL, larastan
+        // teaches it Laravel's magic — include whichever is installed
+        // (extension-installer users get them wired automatically)
+        if (!is_dir("$root/vendor/phpstan/extension-installer")) {
+            foreach (['pestphp/pest-plugin-phpstan', 'larastan/larastan'] as $phpstanExtension) {
+                if (file_exists("$root/vendor/$phpstanExtension/extension.neon")) {
+                    $includes[] = "$root/vendor/$phpstanExtension/extension.neon";
+                }
+            }
         }
 
         // the baseline may also be listed explicitly under `includes`
@@ -515,6 +518,94 @@ class Core
 
         static::ensureAlchemyDir();
         \Leaf\FS\File::create(getcwd() . '/.alchemy/.rector.dist.php', $rectorDist, ['overwrite' => true]);
+    }
+
+    /**
+     * Pest is the default engine everywhere, regardless of framework:
+     * phpunit only wins when the project carries phpunit without pest.
+     * (Pest depends on phpunit, so a pest project matches both binaries.)
+     * Vendor is checked first; composer.json covers a fresh clone whose
+     * vendor isn't installed yet.
+     */
+    public static function detectTestEngine(): string
+    {
+        if (file_exists(getcwd() . '/vendor/bin/pest')) {
+            return 'pest';
+        }
+
+        if (file_exists(getcwd() . '/vendor/bin/phpunit')) {
+            return 'phpunit';
+        }
+
+        $composerJsonFile = getcwd() . '/composer.json';
+        $composerJson = file_exists($composerJsonFile) ? (json_decode((string) file_get_contents($composerJsonFile), true) ?? []) : [];
+        $deps = array_merge($composerJson['require'] ?? [], $composerJson['require-dev'] ?? []);
+
+        if (isset($deps['pestphp/pest'])) {
+            return 'pest';
+        }
+
+        return isset($deps['phpunit/phpunit']) ? 'phpunit' : 'pest';
+    }
+
+    /**
+     * Normalize lint.provider — accepts phpcsfixer/php-cs-fixer/pint,
+     * defaults to php-cs-fixer. Returns null for anything unknown.
+     */
+    public static function lintProvider(): ?string
+    {
+        $lintConfig = is_array(static::get('lint')) ? static::get('lint') : [];
+        $provider = str_replace('-', '', strtolower((string) ($lintConfig['provider'] ?? 'phpcsfixer')));
+
+        return in_array($provider, ['phpcsfixer', 'pint']) ? $provider : null;
+    }
+
+    /**
+     * Pint reads php-cs-fixer rules but names its presets in lowercase and
+     * carries paths on the command line, so its config is a small json file
+     */
+    public static function generatePintConfig(bool $ejected = false)
+    {
+        $config = static::get();
+        $lintConfig = is_array($config['lint'] ?? null) ? $config['lint'] : [];
+
+        if (!$ejected) {
+            static::cleanStaleRootConfigs();
+        }
+
+        // pint speaks lowercase preset names; the fixer spellings map over
+        $presetMap = ['PSR12' => 'psr12', 'PSR-12' => 'psr12', 'PER' => 'per', 'PER-CS' => 'per', 'PER-CS2.0' => 'per', 'Symfony' => 'symfony', 'Laravel' => 'laravel'];
+        $preset = $lintConfig['preset'] ?? 'laravel';
+        $preset = $presetMap[$preset] ?? strtolower((string) $preset);
+
+        $pintJson = ['preset' => $preset];
+
+        if (!empty($lintConfig['rules'])) {
+            $pintJson['rules'] = $lintConfig['rules'];
+        }
+
+        if (!empty($lintConfig['exclude'])) {
+            $pintJson['exclude'] = array_values((array) $lintConfig['exclude']);
+        }
+
+        // any other lint key (notName, notPath, future pint options) passes
+        // through verbatim, so the section is never less expressive than a
+        // hand-written pint.json
+        $alchemyKeys = ['provider', 'preset', 'rules', 'exclude', 'risky', 'autofix', 'parallel', 'ignore_tests', 'ignore_dot_files', 'ignore_vc_files'];
+
+        foreach (array_diff_key($lintConfig, array_flip($alchemyKeys)) as $key => $value) {
+            $pintJson[$key] = $value;
+        }
+
+        if (!$ejected) {
+            static::ensureAlchemyDir();
+        }
+
+        \Leaf\FS\File::create(
+            $ejected ? getcwd() . '/pint.json' : getcwd() . '/.alchemy/pint.json',
+            json_encode($pintJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
+            ['overwrite' => true]
+        );
     }
 
     public static function generateLintFiles(bool $ejected = false)

@@ -34,6 +34,16 @@ test('init creates alchemy.yml and wires composer scripts', function () {
     expect($exit)->toBe(0)
         ->and(file_exists(getcwd() . '/alchemy.yml'))->toBeTrue();
 
+    // init writes the full pipeline — a section's presence opts the tool in,
+    // so analyse and refactor must be present to ever run
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($yml)->toContain('analyse:')
+        ->and($yml)->toContain('refactor:')
+        // CI stays lint + tests only — analyse/refactor are local by default
+        ->and($yml)->not->toContain('- analyse')
+        ->and($yml)->not->toContain('- refactor');
+
     $composerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
 
     expect($composerJson['scripts']['test'] ?? null)->toContain('alchemy test')
@@ -78,6 +88,56 @@ XML);
         ->and($yml)->toContain('stopOnFailure: true')
         ->and(file_exists(getcwd() . '/phpunit.xml'))->toBeFalse()
         ->and(file_exists(getcwd() . '/.alchemy/phpunit.xml.bak'))->toBeTrue();
+});
+
+test('init selects pint for laravel projects', function () {
+    writeComposerJson(['require' => ['laravel/framework' => '^11.0']]);
+    mkdir(getcwd() . '/app');
+
+    [$exit] = alchemy('init');
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($exit)->toBe(0)
+        ->and($yml)->toContain('provider: pint')
+        ->and($yml)->toContain('preset: laravel');
+});
+
+test('init --port turns a pint.json into a lint section', function () {
+    writeComposerJson(['require' => ['laravel/framework' => '^11.0']]);
+    mkdir(getcwd() . '/app');
+    file_put_contents(getcwd() . '/pint.json', json_encode([
+        'preset' => 'laravel',
+        'rules' => ['single_quote' => true],
+    ]));
+
+    [$exit, $output] = alchemy('init --port');
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Imported pint.json')
+        ->and($yml)->toContain('provider: pint')
+        ->and($yml)->toContain('preset: laravel')
+        ->and($yml)->toContain('single_quote: true')
+        ->and(file_exists(getcwd() . '/pint.json'))->toBeFalse()
+        ->and(file_exists(getcwd() . '/.alchemy/pint.json.bak'))->toBeTrue();
+});
+
+test('init ports pint-only keys like notPath verbatim', function () {
+    writeComposerJson(['require' => ['laravel/framework' => '^11.0']]);
+    mkdir(getcwd() . '/app');
+    file_put_contents(getcwd() . '/pint.json', json_encode([
+        'preset' => 'laravel',
+        'notPath' => ['bootstrap/cache'],
+    ]));
+
+    [$exit] = alchemy('init --port');
+    $yml = file_get_contents(getcwd() . '/alchemy.yml');
+
+    expect($exit)->toBe(0)
+        ->and($yml)->toContain('provider: pint')
+        ->and($yml)->toContain('notPath:')
+        ->and($yml)->toContain('bootstrap/cache')
+        ->and(file_exists(getcwd() . '/pint.json'))->toBeFalse();
 });
 
 test('init records use-as-is choices as pinned string sections', function () {
@@ -402,6 +462,84 @@ PHP);
         ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain("'double'")
         ->and(file_get_contents(getcwd() . '/.php-cs-fixer.dist.php'))->toBe($userConfigBefore);
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('lint with provider pint runs pint on the configured paths', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\nlint:\n  provider: pint\n  preset: psr12\n  rules:\n    single_quote: true\n");
+    file_put_contents(getcwd() . '/src/Bad.php', "<?php\n\n\$x = \"double\";\n");
+
+    [$checkExit, $checkOutput] = alchemy('lint');
+
+    expect($checkExit)->toBe(1)
+        ->and($checkOutput)->toContain('Style violations found')
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain('"double"');
+
+    [$fmtExit] = alchemy('fmt');
+
+    expect($fmtExit)->toBe(0)
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain("'double'")
+        ->and(file_exists(getcwd() . '/pint.json'))->toBeFalse();
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('fmt forwards --flags to pint', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\nlint:\n  provider: pint\n  preset: psr12\n  rules:\n    single_quote: true\n");
+    file_put_contents(getcwd() . '/src/Bad.php', "<?php\n\n\$x = \"double\";\n");
+
+    // --flags=test turns fix mode into check mode — proof the flag reached pint
+    [$exit] = alchemy('fmt --flags=test');
+
+    expect($exit)->toBe(1)
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain('"double"');
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('lint respects an existing pint.json when alchemy.yml has no lint section', function () {
+    writeComposerJson();
+    linkVendor();
+    mkdir(getcwd() . '/src');
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n");
+    file_put_contents(getcwd() . '/pint.json', json_encode(['preset' => 'psr12', 'rules' => ['single_quote' => true]]));
+    $userConfigBefore = file_get_contents(getcwd() . '/pint.json');
+    file_put_contents(getcwd() . '/src/Bad.php', "<?php\n\n\$x = \"double\";\n");
+
+    [$fmtExit, $fmtOutput] = alchemy('fmt');
+
+    expect($fmtExit)->toBe(0)
+        ->and($fmtOutput)->toContain('Using your existing pint.json')
+        ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain("'double'")
+        ->and(file_get_contents(getcwd() . '/pint.json'))->toBe($userConfigBefore);
+})->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
+
+test('eject exports pint.json when the provider is pint', function () {
+    writeComposerJson(['scripts' => ['alchemy' => '@php vendor/bin/alchemy setup']]);
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\ntests:\n  engine: pest\n\nlint:\n  provider: pint\n  preset: laravel\n");
+
+    [$exit] = alchemy('eject');
+
+    expect($exit)->toBe(0)
+        ->and(file_exists(getcwd() . '/phpunit.xml'))->toBeTrue()
+        ->and(file_exists(getcwd() . '/pint.json'))->toBeTrue()
+        ->and(file_exists(getcwd() . '/.php-cs-fixer.dist.php'))->toBeFalse()
+        ->and(json_decode(file_get_contents(getcwd() . '/pint.json'), true))->toBe(['preset' => 'laravel']);
+
+    $composerJson = json_decode(file_get_contents(getcwd() . '/composer.json'), true);
+
+    expect($composerJson['scripts']['lint'])->toContain('vendor/bin/pint');
+});
+
+test('lint rejects an unknown provider', function () {
+    writeComposerJson();
+    file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\nlint:\n  provider: eslint\n");
+
+    [$exit, $output] = alchemy('lint');
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('Unknown lint provider');
+});
 
 test('tests respect an existing phpunit.xml when alchemy.yml has no tests section', function () {
     writeComposerJson();

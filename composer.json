@@ -22,8 +22,8 @@
     ],
     "require": {
         "ext-json": "*",
-        "leafs/fs": "*",
-        "leafs/sprout": "*",
+        "leafs/fs": "5.0-alpha",
+        "leafs/sprout": "5.0-alpha",
         "symfony/yaml": "*",
         "php": "^8.2"
     },
@@ -55,6 +55,7 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "*",
-        "pestphp/pest": "*"
+        "pestphp/pest": "*",
+        "laravel/pint": "*"
     }
 }
