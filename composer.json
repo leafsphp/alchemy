@@ -26,6 +26,11 @@
         "symfony/yaml": "*",
         "php": "^8.2"
     },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "*",
+        "pestphp/pest": "*",
+        "laravel/pint": "*"
+    },
     "bin": [
         "bin/alchemy"
     ],
@@ -51,10 +56,5 @@
         "lint": "@php bin/alchemy lint",
         "fmt": "@php bin/alchemy fmt",
         "ci": "@php bin/alchemy ci"
-    },
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "*",
-        "pestphp/pest": "*",
-        "laravel/pint": "*"
     }
 }
