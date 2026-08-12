@@ -490,10 +490,13 @@ test('fmt forwards --flags to pint', function () {
     file_put_contents(getcwd() . '/alchemy.yml', "app:\n  - src\n\nlint:\n  provider: pint\n  preset: psr12\n  rules:\n    single_quote: true\n");
     file_put_contents(getcwd() . '/src/Bad.php', "<?php\n\n\$x = \"double\";\n");
 
-    // --flags=test turns fix mode into check mode — proof the flag reached pint
-    [$exit] = alchemy('fmt --flags=test');
+    // --flags=test,ansi turns fix mode into check mode — proof both flags
+    // reached pint (a broken forward like `--1` also exits 1 without fixing,
+    // so the Unknown-option assertion is what actually catches regressions)
+    [$exit, $output] = alchemy('fmt --flags=test,ansi');
 
     expect($exit)->toBe(1)
+        ->and($output)->not->toContain('Unknown option')
         ->and(file_get_contents(getcwd() . '/src/Bad.php'))->toContain('"double"');
 })->skip(PHP_OS_FAMILY === 'Windows', 'vendor symlink not reliable on Windows runners');
 

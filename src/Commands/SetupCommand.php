@@ -15,7 +15,7 @@ class SetupCommand extends Command
         {--ci|actions? : Generate GitHub actions}
         {--c|check? : Check without changing anything (used in CI)}
         {--f|force? : Replace test or tests folder if it exists}
-        {--flags? : Add flags to the command being run separated by commas}';
+        {--flags= : Add flags to the command being run separated by commas}';
     protected $description = 'Setup work environment based on Alchemy configuration';
     protected $help = 'This command will help you setup your work environment based on the alchemy.yml configuration file.';
 
@@ -194,9 +194,7 @@ class SetupCommand extends Command
 
             $userFlags = '--configuration ' . getcwd() . "/$userConfig";
             $userFlags .= $engine === 'pest' ? ' --colors=always' : '';
-            $userFlags .= $this->option('flags')
-                ? (' --' . implode(' --', explode(',', $this->option('flags'))))
-                : '';
+            $userFlags .= $this->forwardedFlags();
 
             $testProcess = sprout()
                 ->process(getcwd() . "/vendor/bin/$engine $userFlags")
@@ -246,9 +244,7 @@ class SetupCommand extends Command
             $flags .= ' --' . ltrim((string) $engineFlag, '-');
         }
 
-        $flags .= $this->option('flags')
-            ? (' --' . implode(' --', explode(',', $this->option('flags'))))
-            : '';
+        $flags .= $this->forwardedFlags();
 
         if ($parallel) {
             $this->writeln('<info>  > Running tests in parallel...</info>');
@@ -524,7 +520,7 @@ class SetupCommand extends Command
             $lintCommand = $provider === 'pint'
                 ? getcwd() . "/vendor/bin/pint --config $userConfig" . ($check ? ' --test' : '')
                 : getcwd() . "/vendor/bin/php-cs-fixer fix --config=$userConfig" . ($check ? ' --dry-run --diff' : '');
-            $lintCommand .= $this->linterFlagOptions();
+            $lintCommand .= $this->forwardedFlags();
 
             $lintProcess = sprout()
                 ->process($lintCommand)
@@ -565,7 +561,7 @@ class SetupCommand extends Command
             $lintFlags = ' --config ' . getcwd() . '/.alchemy/pint.json --cache-file ' . getcwd() . '/.alchemy/.pint.cache';
             $lintFlags .= ($lintConfig['parallel'] ?? false) ? ' --parallel' : '';
             $lintFlags .= $check ? ' --test' : '';
-            $lintFlags .= $this->linterFlagOptions();
+            $lintFlags .= $this->forwardedFlags();
 
             // pint carries paths as arguments, not config
             $lintCommand = getcwd() . '/vendor/bin/pint'
@@ -575,7 +571,7 @@ class SetupCommand extends Command
             Core::generateLintFiles();
 
             $risky = ($lintConfig['risky'] ?? true) ? ' --allow-risky=yes' : '';
-            $lintFlags = $risky . ($check ? ' --dry-run --diff' : '') . $this->linterFlagOptions();
+            $lintFlags = $risky . ($check ? ' --dry-run --diff' : '') . $this->forwardedFlags();
             $lintCommand = getcwd() . '/vendor/bin/php-cs-fixer fix --config=' . getcwd() . "/.alchemy/.php_cs.dist.php$lintFlags";
         }
 
@@ -619,14 +615,21 @@ class SetupCommand extends Command
     }
 
     /**
-     * `composer run fmt -- --flags=dirty` forwards any linter flag —
-     * pint's --dirty/--repair/--blade, the fixer's --path-mode, whatever
+     * `composer run test -- --flags=coverage` forwards any engine flag.
+     * Sprout hands a comma-separated value back as an array already, so
+     * accept both shapes.
      */
-    protected function linterFlagOptions(): string
+    protected function forwardedFlags(): string
     {
-        return $this->option('flags')
-            ? (' --' . implode(' --', explode(',', $this->option('flags'))))
-            : '';
+        $flagsOption = $this->option('flags');
+
+        if (!$flagsOption || $flagsOption === true) {
+            return '';
+        }
+
+        $flagList = is_array($flagsOption) ? $flagsOption : explode(',', (string) $flagsOption);
+
+        return ' --' . implode(' --', array_map(fn ($flag) => ltrim((string) $flag, '-'), $flagList));
     }
 
     protected function ensureLinterInstalled(string $provider): int

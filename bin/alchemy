@@ -7,8 +7,11 @@ if (file_exists(dirname(__DIR__, 4) . '/vendor/autoload.php')) {
     require dirname(__DIR__) . '/vendor/autoload.php';
 }
 
-$alchemy = json_decode(file_get_contents(dirname(__DIR__) . '/composer.json'));
-$currentVersion = $alchemy->version;
+// composer.json carries no version key (packagist derives it from tags), so
+// ask composer's runtime for the installed version instead
+$currentVersion = \Composer\InstalledVersions::isInstalled('leafs/alchemy')
+    ? \Composer\InstalledVersions::getPrettyVersion('leafs/alchemy')
+    : 'dev';
 
 $app = sprout()->createApp([
     'name' => "

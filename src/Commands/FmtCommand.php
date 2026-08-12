@@ -5,7 +5,7 @@ namespace Leaf\Alchemy\Commands;
 class FmtCommand extends SetupCommand
 {
     protected $signature = 'fmt
-        {--flags? : Add flags to the linter, separated by commas (e.g. --flags=dirty)}';
+        {--flags= : Add flags to the linter, separated by commas (e.g. --flags=dirty)}';
     protected $description = 'Fix code style issues';
     protected $help = 'Runs your linter in fix mode and rewrites files to match your style config.';
     protected $modeOverride = 'fix';
