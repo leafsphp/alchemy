@@ -21,8 +21,8 @@
     ],
     "require": {
         "ext-json": "*",
-        "leafs/fs": "5.0-alpha",
-        "leafs/sprout": "5.0-alpha",
+        "leafs/fs": "v5.x-dev",
+        "leafs/sprout": "v5.x-dev",
         "symfony/yaml": "*",
         "php": "^8.2"
     },
