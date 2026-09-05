@@ -732,13 +732,29 @@ class SetupCommand extends Command
             $testsConfig = is_array(Core::get('tests')) ? Core::get('tests') : [];
             $database = $testsConfig['database'] ?? false;
 
-            $actionsCoverage = (
+            $actionsCoverageEnabled = (
                 $config['tests']['coverage']['actions'] ??
                 $testsConfig['coverage']['actions'] ??
                 true
-            ) ? 'xdebug' : 'none';
+            );
 
-            $coverageFlags = $actionsCoverage !== 'none' ? ' -- --flags=coverage' : '';
+            // Coverage runs on exactly one matrix cell: coverage numbers are the
+            // same on every OS, and coverage drivers lag behind fresh PHP
+            // releases on Windows/macOS runners. Every other cell runs plain
+            // tests with coverage: none.
+            $primaryOs = in_array('ubuntu-latest', $os) ? 'ubuntu-latest' : $os[0];
+            $primaryPhp = array_reduce($phpVersions, function ($carry, $version) {
+                return ($carry === null || version_compare((string) $version, (string) $carry, '>')) ? $version : $carry;
+            });
+            $isPrimaryCell = "matrix.os == '$primaryOs' && matrix.php == '$primaryPhp'";
+
+            $actionsCoverage = $actionsCoverageEnabled
+                ? "\${{ ($isPrimaryCell) && 'xdebug' || 'none' }}"
+                : 'none';
+
+            $coverageFlags = $actionsCoverageEnabled
+                ? "\${{ ($isPrimaryCell) && ' -- --flags=coverage' || '' }}"
+                : '';
 
             if ($database) {
                 $dbName = $database['connection']['name'] ?? 'test';

@@ -361,8 +361,13 @@ YML);
 
     [$exit] = alchemy('ci');
 
+    $workflow = file_get_contents(getcwd() . '/.github/workflows/tests.yml');
+
+    // coverage is emitted as a single-cell conditional: xdebug on the primary
+    // matrix cell only, none everywhere else (drivers lag on windows/macos)
     expect($exit)->toBe(0)
-        ->and(file_get_contents(getcwd() . '/.github/workflows/tests.yml'))->toContain('coverage: xdebug');
+        ->and($workflow)->toContain("&& 'xdebug' || 'none'")
+        ->and($workflow)->toContain("--flags=coverage' || ''");
 });
 
 test('switch moves ci providers and cleans up old files', function () {
