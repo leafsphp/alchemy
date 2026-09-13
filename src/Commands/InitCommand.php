@@ -430,7 +430,6 @@ class InitCommand extends Command
             $settings = [];
 
             foreach ((new \ReflectionObject($builder))->getProperties() as $property) {
-                $property->setAccessible(true);
                 $settings[$property->getName()] = $property->getValue($builder);
             }
         } catch (\Throwable $exception) {
