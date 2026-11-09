@@ -21,7 +21,7 @@
     ],
     "require": {
         "ext-json": "*",
-        "leafs/fs": "^5.0",
+        "leafs/fs": "^4.0 || ^5.0",
         "leafs/sprout": "^5.0",
         "symfony/yaml": "*",
         "php": "^8.2"
