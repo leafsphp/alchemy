@@ -10,6 +10,9 @@
 |
 */
 
+// php-cs-fixer refuses to run on PHP versions it does not list yet (8.6)
+putenv('PHP_CS_FIXER_IGNORE_ENV=1');
+
 function sandboxSetup(): void
 {
     $GLOBALS['__alchemyTestCwd'] = getcwd();
